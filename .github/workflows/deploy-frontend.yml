@@ -1,0 +1,93 @@
+name: Deploy Frontend to Azure Static Web Apps
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20.x'
+  RESOURCE_GROUP: weaver-rg
+  STATIC_WEB_APP: weaver-frontend
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+      
+      - name: Get backend URL
+        id: backend
+        run: |
+          # Log in to Azure
+          echo "${{ secrets.AZURE_CREDENTIALS }}" | base64 -d > creds.json
+          az login --service-principal -u $(jq -r .clientId creds.json) -p $(jq -r .clientSecret creds.json) --tenant $(jq -r .tenantId creds.json)
+          rm creds.json
+          
+          # Get backend URL
+          BACKEND_URL=$(az containerapp show \
+            --name weaver-backend \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query 'properties.configuration.ingress.fqdn' -o tsv)
+          echo "backend_url=https://$BACKEND_URL" >> $GITHUB_OUTPUT
+      
+      - name: Build frontend
+        working-directory: ./frontend
+        env:
+          VITE_API_URL: ${{ steps.backend.outputs.backend_url }}
+        run: npm run build
+      
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      - name: Deploy to Azure Static Web Apps
+        run: |
+          az staticwebapp deploy \
+            --name ${{ env.STATIC_WEB_APP }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --app-location "./frontend" \
+            --output-location "dist" \
+            --env production
+      
+      - name: Get frontend URL
+        id: frontend
+        run: |
+          FRONTEND_URL=$(az staticwebapp show \
+            --name ${{ env.STATIC_WEB_APP }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query 'defaultHostname' -o tsv)
+          echo "frontend_url=https://$FRONTEND_URL" >> $GITHUB_OUTPUT
+      
+      - name: Update backend CORS
+        run: |
+          # Update Container App CORS to allow frontend domain
+          az containerapp update \
+            --name weaver-backend \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --set-env-vars "CORS_ORIGINS=${{ steps.frontend.outputs.frontend_url }}"
+      
+      - name: Notification
+        if: success()
+        run: |
+          echo "✅ Frontend deployed successfully!"
+          echo "Frontend URL: ${{ steps.frontend.outputs.frontend_url }}"
+          echo "Backend URL: ${{ steps.backend.outputs.backend_url }}"

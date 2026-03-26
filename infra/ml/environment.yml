@@ -1,0 +1,14 @@
+name: weaver-ml-env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - scikit-learn==1.6.0
+      - numpy==1.26.4
+      - pandas==2.2.0
+      - joblib==1.4.2
+      - azure-ai-ml==1.23.1
+      - azure-identity==1.19.0

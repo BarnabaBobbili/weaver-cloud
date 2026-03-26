@@ -1,0 +1,15 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+command: python train.py --output-model-path ${{outputs.model_output}}
+code: ../backend/app/ml
+environment: azureml:weaver-ml-env@latest
+compute: azureml:cpu-cluster
+inputs:
+  dataset:
+    type: uri_file
+    path: azureml:sensitivity-dataset@latest
+outputs:
+  model_output:
+    type: uri_folder
+display_name: sensitivity_classifier_training
+experiment_name: weaver_ml_training
+description: Train sensitivity classification model for Weaver cryptographic policy engine

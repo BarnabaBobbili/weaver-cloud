@@ -1,0 +1,63 @@
+name: Deploy Backend to Azure Container Apps
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+env:
+  REGISTRY: weaveracr.azurecr.io
+  IMAGE_NAME: weaver-backend
+  RESOURCE_GROUP: weaver-rg
+  CONTAINER_APP: weaver-backend
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Login to Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+      
+      - name: Login to Azure CLI
+        run: |
+          az login --service-principal -u ${{ secrets.ACR_USERNAME }} -p ${{ secrets.ACR_PASSWORD }} --tenant ${{ secrets.AZURE_TENANT_ID }}
+          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Deploy to Azure Container Apps
+        run: |
+          az containerapp update \
+            --name ${{ env.CONTAINER_APP }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+      
+      - name: Verify deployment
+        run: |
+          BACKEND_URL=$(az containerapp show \
+            --name ${{ env.CONTAINER_APP }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query 'properties.configuration.ingress.fqdn' -o tsv)
+          echo "Backend URL: https://$BACKEND_URL"
+          sleep 30
+          curl -f https://$BACKEND_URL/health || exit 1
+
