@@ -33,10 +33,14 @@ It will look like this:
 
 ### 2️⃣ Get Azure Container Registry Credentials
 
-**Already retrieved for you:**
+Run this command and copy the output values:
 
-- **ACR_USERNAME:** `weaveracr`
-- **ACR_PASSWORD:** `1e1SDwOUXuM3bByFVTpMMVrEUA3yB1I0jFcBYylibqFPRnCa74s0JQQJ99CCACGhslBEqg7NAAACAZCRoPOY`
+```bash
+az acr credential show --name weaveracr
+```
+
+- **ACR_USERNAME:** Use the `username` value
+- **ACR_PASSWORD:** Use one of the `passwords[].value` values
 
 ---
 
@@ -71,7 +75,7 @@ Click **"New repository secret"** for each of these:
 
 #### Secret 3: ACR_PASSWORD
 - **Name:** `ACR_PASSWORD`
-- **Value:** `1e1SDwOUXuM3bByFVTpMMVrEUA3yB1I0jFcBYylibqFPRnCa74s0JQQJ99CCACGhslBEqg7NAAACAZCRoPOY`
+- **Value:** Paste the password from Step 2
 
 #### Secret 4: AZURE_STATIC_WEB_APPS_API_TOKEN
 - **Name:** `AZURE_STATIC_WEB_APPS_API_TOKEN`
