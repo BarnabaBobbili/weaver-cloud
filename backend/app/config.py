@@ -77,6 +77,11 @@ class Settings:
         self.BLOB_CONTAINER_PAYLOADS: str = "encrypted-payloads"
         self.BLOB_CONTAINER_MODELS: str = "ml-models"
         self.BLOB_CONTAINER_DATASETS: str = "ml-datasets"
+
+        # Synapse incremental sync config
+        self.SYNAPSE_SYNC_PREFIX: str = os.environ.get("SYNAPSE_SYNC_PREFIX", "postgres_sync")
+        self.SYNAPSE_SYNC_BATCH_SIZE: int = int(os.environ.get("SYNAPSE_SYNC_BATCH_SIZE", "5000"))
+        self.SYNAPSE_SYNC_API_KEY: str = os.environ.get("SYNAPSE_SYNC_API_KEY", "")
         
         # Threshold for storing in Blob vs DB (1MB)
         self.BLOB_THRESHOLD_BYTES: int = 1024 * 1024

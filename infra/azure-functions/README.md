@@ -1,13 +1,13 @@
-# Azure Functions: Synapse Daily ETL
+# Azure Functions: Synapse Incremental ETL
 
-This function app triggers a daily ETL call to Weaver backend for Synapse export.
+This function app triggers frequent incremental ETL calls to Weaver backend for Synapse export.
 
 ## Purpose
 
-- Schedule-driven analytics export
+- Schedule-driven incremental export
 - Calls backend endpoint:
-  - `POST /api/analytics/synapse/export`
-- Supports optional bearer token via `ADMIN_API_KEY`
+  - `POST /api/analytics/synapse/export/internal`
+- Auth via sync key header `X-Synapse-Sync-Key`
 
 ## Files
 
@@ -20,12 +20,12 @@ This function app triggers a daily ETL call to Weaver backend for Synapse export
 Set these app settings in the Function App:
 
 - `BACKEND_URL` (default points to deployed Weaver backend)
-- `ADMIN_API_KEY` (optional, if endpoint is protected)
+- `SYNAPSE_SYNC_API_KEY` (required, must match backend setting)
 
 ## Schedule
 
-Cron: `0 0 0 * * *`  
-Execution: daily at 00:00:00 UTC
+Cron: `0 */5 * * * *`  
+Execution: every 5 minutes
 
 ## Deployment (CLI)
 

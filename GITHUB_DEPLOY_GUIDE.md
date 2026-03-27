@@ -1,50 +1,55 @@
-# GitHub Actions Cloud Deployment Setup
+# GitHub Actions Deployment Guide (Secure)
 
-## What You Have
-- ACR_USERNAME: weaveracr
-- ACR_PASSWORD: 1e1SDwOUXuM3bByFVTpMMVrEUA3yB1I0jFcBYylibqFPRnCa74s0JQQJ99CCACGhslBEqg7NAAACAZCRoPOY
-- AZURE_SUBSCRIPTION_ID: 7e28e79f-6729-47d7-accc-38b7c1cefdf1
+This guide configures Weaver CI/CD without embedding raw credentials in the repository.
 
-## Steps to Deploy
+## 1. Required GitHub Secrets
 
-### 1. Push Code to GitHub
+Add these in: `Settings -> Secrets and variables -> Actions`
+
+- `AZURE_CREDENTIALS` (service principal JSON)
+- `ACR_USERNAME`
+- `ACR_PASSWORD`
+
+## 2. Create Service Principal for `AZURE_CREDENTIALS`
+
 ```powershell
-cd E:\MTech\MTech Sem2\Cloud\Project\Weaver
-git init
-git add .
-git commit -m "Initial deployment"
-git remote add origin https://github.com/YOUR_USERNAME/Weaver.git
-git push -u origin main
+az ad sp create-for-rbac `
+  --name "weaver-github-actions" `
+  --role contributor `
+  --scopes /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/weaver-rg `
+  --sdk-auth
 ```
 
-### 2. Add GitHub Secrets
-Go to: `https://github.com/YOUR_USERNAME/Weaver/settings/secrets/actions`
+Copy the JSON output and store it as `AZURE_CREDENTIALS`.
 
-Click "New repository secret" and add:
+## 3. Get ACR Credentials
 
-**Secret 1:**
-- Name: `ACR_USERNAME`
-- Value: `weaveracr`
+```powershell
+az acr credential show --name weaveracr --query username -o tsv
+az acr credential show --name weaveracr --query "passwords[0].value" -o tsv
+```
 
-**Secret 2:**
-- Name: `ACR_PASSWORD`
-- Value: `1e1SDwOUXuM3bByFVTpMMVrEUA3yB1I0jFcBYylibqFPRnCa74s0JQQJ99CCACGhslBEqg7NAAACAZCRoPOY`
+Set outputs as:
 
-**Secret 3:**
-- Name: `AZURE_SUBSCRIPTION_ID`
-- Value: `7e28e79f-6729-47d7-accc-38b7c1cefdf1`
+- `ACR_USERNAME`
+- `ACR_PASSWORD`
 
-### 3. Trigger Deployment
-- Go to Actions tab in GitHub
-- Click "Deploy Backend to Azure Container Apps"
-- Click "Run workflow"
+## 4. Workflows in This Repo
 
-GitHub will build Docker image in the cloud and push to your ACR, then deploy to Container Apps.
+- Backend deploy: `.github/workflows/deploy-backend.yml`
+- Frontend deploy: `.github/workflows/deploy-frontend.yml`
 
-### 4. Deploy Frontend (After Backend Works)
-Run: `.\deploy-frontend.ps1`
+Both can run on `push` to `main` or via `workflow_dispatch`.
 
-## Result
-- Backend: Container Apps with auto-scaling
-- Frontend: Static Web App
-- 100% Cloud-based (no local Docker needed)
+## 5. Verification
+
+After workflow success:
+
+- Backend health: `https://weaver-backend.whitehill-eea76820.centralindia.azurecontainerapps.io/health`
+- Frontend: `https://salmon-meadow-04fa55300.1.azurestaticapps.net`
+
+## 6. Security Checklist
+
+- Rotate service principal secret periodically.
+- Rotate ACR passwords periodically.
+- Never commit connection strings, PATs, or cloud secrets into Markdown/docs.

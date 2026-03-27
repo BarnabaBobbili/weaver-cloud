@@ -1,7 +1,7 @@
 """
-Azure Function: Synapse Daily ETL
+Azure Function: Synapse Incremental ETL
 
-Runs daily at midnight UTC to export data from PostgreSQL to Synapse Data Lake.
+Runs on a frequent timer to export PostgreSQL data to Synapse Data Lake.
 Triggered by a timer schedule.
 """
 import os
@@ -13,31 +13,31 @@ app = func.FunctionApp()
 
 # Get backend URL from environment
 BACKEND_URL = os.environ.get("BACKEND_URL", "https://weaver-backend.whitehill-eea76820.centralindia.azurecontainerapps.io")
-ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY", "")  # Set this in Function App settings
+SYNAPSE_SYNC_API_KEY = os.environ.get("SYNAPSE_SYNC_API_KEY", "")
 
 
-@app.schedule(schedule="0 0 0 * * *", arg_name="mytimer", run_on_startup=False,
+@app.schedule(schedule="0 */5 * * * *", arg_name="mytimer", run_on_startup=False,
               use_monitor=False) 
 def synapse_daily_export(mytimer: func.TimerRequest) -> None:
     """
-    Runs daily at midnight UTC.
+    Runs every 5 minutes.
     
     Schedule format: {second} {minute} {hour} {day} {month} {day-of-week}
-    "0 0 0 * * *" = Every day at midnight
+    "0 */5 * * * *" = Every 5 minutes
     """
     if mytimer.past_due:
         logging.info('The timer is past due!')
 
-    logging.info('Starting Synapse daily ETL export...')
+    logging.info('Starting Synapse incremental ETL export...')
 
     try:
-        # Call the backend export endpoint
-        headers = {}
-        if ADMIN_API_KEY:
-            headers["Authorization"] = f"Bearer {ADMIN_API_KEY}"
+        if not SYNAPSE_SYNC_API_KEY:
+            raise ValueError("SYNAPSE_SYNC_API_KEY is not configured")
+
+        headers = {"X-Synapse-Sync-Key": SYNAPSE_SYNC_API_KEY}
 
         response = httpx.post(
-            f"{BACKEND_URL}/api/analytics/synapse/export",
+            f"{BACKEND_URL}/api/analytics/synapse/export/internal?include_daily_rollup=false",
             headers=headers,
             timeout=300.0  # 5 minute timeout
         )
@@ -56,4 +56,4 @@ def synapse_daily_export(mytimer: func.TimerRequest) -> None:
         logging.error(f"Unexpected error during Synapse export: {e}")
         raise
 
-    logging.info('Synapse daily ETL export finished')
+    logging.info('Synapse incremental ETL export finished')

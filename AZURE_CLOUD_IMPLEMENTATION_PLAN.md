@@ -1,5 +1,12 @@
 # Weaver — Azure Cloud Implementation Plan
 
+> **Status update (2026-03-27):** This file is retained as the original planning artifact.  
+> For current implementation state and verified runtime details, use:
+> - `README.md`
+> - `IMPLEMENTATION_STATUS.md`
+> - `AZURE_IMPLEMENTATION_COMPLETE.md`
+> - `docs/PROJECT_DOCUMENTATION.md`
+
 ## Full Cloud-Only Deployment Guide (No Local Fallback)
 
 > **Project**: AI-Driven Adaptive Cryptographic Policy Engine

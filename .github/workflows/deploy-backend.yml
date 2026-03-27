@@ -65,7 +65,11 @@ jobs:
           az containerapp update \
             --name ${{ env.CONTAINER_APP }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --set-env-vars \
+              SYNAPSE_SYNC_PREFIX=postgres_sync \
+              SYNAPSE_SYNC_BATCH_SIZE=5000 \
+              SYNAPSE_SYNC_API_KEY=${{ secrets.SYNAPSE_SYNC_API_KEY }}
       
       - name: Verify deployment
         run: |

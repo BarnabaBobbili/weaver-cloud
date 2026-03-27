@@ -1,8 +1,10 @@
 from datetime import datetime, timedelta, timezone
 from math import ceil
 import logging
+import os
+import secrets
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -623,6 +625,7 @@ async def admin_security_alerts(
 
 @router.post("/synapse/export")
 async def trigger_synapse_export(
+    include_daily_rollup: bool = True,
     current_user: User = Depends(require_roles(["admin"])),
     db: AsyncSession = Depends(get_db),
 ):
@@ -637,7 +640,7 @@ async def trigger_synapse_export(
     synapse = get_synapse_service()
 
     try:
-        result = await synapse.run_daily_etl(db)
+        result = await synapse.run_daily_etl(db, include_daily_rollup=include_daily_rollup)
         return {
             "status": "success",
             "message": "Data export completed",
@@ -645,6 +648,39 @@ async def trigger_synapse_export(
         }
     except Exception as e:
         logger.error(f"Synapse export failed: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@router.post("/synapse/export/internal")
+async def trigger_synapse_export_internal(
+    include_daily_rollup: bool = False,
+    sync_key: str | None = Header(default=None, alias="X-Synapse-Sync-Key"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Internal automated export endpoint for scheduler jobs.
+
+    Auth is API-key based so timer jobs can trigger export without interactive login.
+    """
+    expected_key = os.environ.get("SYNAPSE_SYNC_API_KEY", "")
+    if not expected_key:
+        raise HTTPException(status_code=503, detail="SYNAPSE_SYNC_API_KEY is not configured")
+    if not sync_key or not secrets.compare_digest(sync_key, expected_key):
+        raise HTTPException(status_code=401, detail="Invalid sync key")
+
+    from app.services.synapse_service import get_synapse_service
+
+    synapse = get_synapse_service()
+
+    try:
+        result = await synapse.run_daily_etl(db, include_daily_rollup=include_daily_rollup)
+        return {
+            "status": "success",
+            "message": "Internal sync completed",
+            "details": result,
+        }
+    except Exception as e:
+        logger.error(f"Internal Synapse export failed: {e}")
         return {"status": "error", "message": str(e)}
 
 
