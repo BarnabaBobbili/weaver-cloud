@@ -780,26 +780,19 @@ async def synapse_powerbi_connection(
     }
 
 
-@router.get("/synapse/dashboards")
-async def synapse_dashboards(
-    current_user: User = Depends(require_roles(["analyst", "admin"])),
-):
-    """Get list of available Synapse analytics dashboards."""
-    dashboards = [
-
-
 @router.get("/test-ml-service")
 async def test_ml_service_endpoint():
     """Test endpoint to check ML service connectivity (no auth required for debugging)."""
     import httpx
+
     result = {
         "env_var_set": bool(os.environ.get("AZURE_ML_ENDPOINT_URL")),
         "env_var_value": os.environ.get("AZURE_ML_ENDPOINT_URL"),
         "ml_service_reachable": False,
         "ml_service_response": None,
-        "error": None
+        "error": None,
     }
-    
+
     ml_endpoint_url = os.environ.get("AZURE_ML_ENDPOINT_URL")
     if ml_endpoint_url:
         try:
@@ -810,11 +803,16 @@ async def test_ml_service_endpoint():
                 result["ml_service_response"] = health_response.json()
         except Exception as e:
             result["error"] = str(e)
-    
+
     return result
 
 
-
+@router.get("/synapse/dashboards")
+async def synapse_dashboards(
+    current_user: User = Depends(require_roles(["analyst", "admin"])),
+):
+    """Get list of available Synapse analytics dashboards."""
+    dashboards = [
         {
             "id": "sensitivity-distribution",
             "name": "Sensitivity Distribution",
