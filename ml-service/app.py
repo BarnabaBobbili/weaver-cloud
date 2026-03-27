@@ -198,6 +198,7 @@ class HealthResponse(BaseModel):
     model_loaded: bool
     device: str
     model_name: str
+    model_version: str
 
 
 def detect_pii(text: str) -> tuple[List[Dict[str, Any]], str, float]:
@@ -359,6 +360,7 @@ async def health_check():
         model_loaded=classifier_pipeline is not None,
         device=DEVICE,
         model_name=MODEL_NAME,
+        model_version="distilbert-mnli-v1.0",
     )
 
 
