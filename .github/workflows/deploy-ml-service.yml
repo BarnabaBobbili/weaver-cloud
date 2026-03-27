@@ -93,6 +93,13 @@ jobs:
             --name ${{ env.CONTAINER_APP }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --query 'properties.configuration.ingress.fqdn' -o tsv)
+
+          az containerapp registry set \
+            --name weaver-backend \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --server ${{ env.REGISTRY }} \
+            --username ${{ secrets.ACR_USERNAME }} \
+            --password ${{ secrets.ACR_PASSWORD }}
           
           # Update backend environment variable to point to new ML service
           az containerapp update \

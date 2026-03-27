@@ -79,6 +79,13 @@ jobs:
       - name: Update backend CORS
         run: |
           # Update Container App CORS to allow frontend domain
+          az containerapp registry set \
+            --name weaver-backend \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --server weaveracr.azurecr.io \
+            --username ${{ secrets.ACR_USERNAME }} \
+            --password ${{ secrets.ACR_PASSWORD }}
+
           az containerapp update \
             --name weaver-backend \
             --resource-group ${{ env.RESOURCE_GROUP }} \
