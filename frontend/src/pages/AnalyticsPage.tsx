@@ -4,6 +4,7 @@ import { BarChart3, Layers, Lock, ShieldAlert } from 'lucide-react';
 import { analyticsApi, profileApi } from '../api';
 import type { AlgorithmUsage, AnalyticsOverview, AuditLog, ProfileActivityItem, SensitivityDistribution, TimeSeriesPoint } from '../types';
 import { formatDetails, formatRelativeTime, humanizeAction } from '../utils/formatters';
+import { ChartCard, SensitivityPieChart, ActivityBarChart } from '../components/DashboardCharts';
 
 const RANGES = ['7D', '30D', '90D'] as const;
 
@@ -72,6 +73,10 @@ export default function AnalyticsPage() {
   const [timeseries, setTimeseries] = useState<TimeSeriesPoint[]>([]);
   const [algorithms, setAlgorithms] = useState<AlgorithmUsage[]>([]);
   const [activity, setActivity] = useState<ActivityRow[]>([]);
+  const [dashboardData, setDashboardData] = useState<{
+    daily_activity: Array<{ date: string; day: string; classifications: number; encryptions: number }>;
+    sensitivity_distribution: { public: number; internal: number; confidential: number; highly_sensitive: number };
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -83,11 +88,12 @@ export default function AnalyticsPage() {
       setError('');
 
       try {
-        const [overviewRes, distributionRes, timeseriesRes, algorithmsRes] = await Promise.all([
+        const [overviewRes, distributionRes, timeseriesRes, algorithmsRes, dashboardRes] = await Promise.all([
           analyticsApi.overview(),
           analyticsApi.sensitivityDistribution(range),
           analyticsApi.sensitivityTimeseries(range),
           analyticsApi.algorithmUsage(),
+          analyticsApi.dashboard(),
         ]);
 
         if (cancelled) return;
@@ -96,6 +102,10 @@ export default function AnalyticsPage() {
         setDistribution(distributionRes.data);
         setTimeseries(timeseriesRes.data.items);
         setAlgorithms(algorithmsRes.data);
+        setDashboardData(dashboardRes.data);
+        
+        // Debug logging
+        console.log('Dashboard data loaded:', dashboardRes.data);
 
         try {
           const auditRes = await analyticsApi.auditLogs({ page: 1, limit: 6 });
@@ -108,14 +118,16 @@ export default function AnalyticsPage() {
             setActivity(normalizeActivity(profileRes.data.items.slice(0, 6), 'profile'));
           }
         }
-      } catch {
+      } catch (err) {
         if (!cancelled) {
+          console.error('Analytics fetch error:', err);
           setError('Analytics data is unavailable right now.');
           setOverview(EMPTY_OVERVIEW);
           setDistribution(EMPTY_DISTRIBUTION);
           setTimeseries([]);
           setAlgorithms([]);
           setActivity([]);
+          setDashboardData(null);
         }
       } finally {
         if (!cancelled) {
@@ -197,6 +209,30 @@ export default function AnalyticsPage() {
         </div>
       )}
 
+      {/* Data Source Banner */}
+      <div style={{ 
+        padding: '12px 16px', 
+        background: 'linear-gradient(90deg, rgba(59,130,246,0.1) 0%, rgba(147,51,234,0.1) 100%)',
+        borderRadius: 8,
+        border: '1px solid rgba(59,130,246,0.3)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12
+      }}>
+        <span style={{ fontSize: 20 }}>💾</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+            Data Source: PostgreSQL (Real-time)
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            Analytics queries are currently served from PostgreSQL. Azure Synapse is available for heavy analytical workloads.
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+          Synapse: Available
+        </div>
+      </div>
+
       <div className="grid-4">
         {[
           {
@@ -230,6 +266,20 @@ export default function AnalyticsPage() {
             <div className="stat-sub">{sub}</div>
           </div>
         ))}
+      </div>
+
+      {/* Activity and Distribution Charts */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, minHeight: 320 }}>
+        <ChartCard title="System Activity (Last 7 Days)" subtitle="All users combined">
+          <div style={{ height: 250 }}>
+            <ActivityBarChart data={dashboardData?.daily_activity || []} />
+          </div>
+        </ChartCard>
+        <ChartCard title="Sensitivity Distribution" subtitle="Classification breakdown">
+          <div style={{ height: 250 }}>
+            <SensitivityPieChart data={dashboardData?.sensitivity_distribution || { public: 0, internal: 0, confidential: 0, highly_sensitive: 0 }} />
+          </div>
+        </ChartCard>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '58% 42%', gap: 16 }}>

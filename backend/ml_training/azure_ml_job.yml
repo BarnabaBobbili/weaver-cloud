@@ -1,0 +1,59 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+type: command
+
+# Job metadata
+display_name: weaver_sensitivity_bert_training
+experiment_name: weaver-sensitivity-classification
+description: |
+  Train DistilBERT model for text sensitivity classification.
+  Target: 92-95% accuracy with advanced XAI capabilities.
+
+# Compute configuration
+compute: azureml:weaver-cpu-cluster
+
+# Environment
+environment:
+  name: weaver-ml-env
+  version: 1
+
+# Code and inputs
+code: ./src
+
+# Training command
+command: >-
+  python train_bert_classifier.py
+  --data-path ${{inputs.training_data}}
+  --output-dir ${{outputs.model_output}}
+  --batch-size 16
+  --learning-rate 2e-5
+  --num-epochs 5
+  --max-length 128
+  --samples-per-class 500
+
+# Inputs
+inputs:
+  training_data:
+    type: uri_file
+    path: azureml://datastores/workspaceblobstore/paths/data/training_data.csv
+    mode: download
+
+# Outputs
+outputs:
+  model_output:
+    type: uri_folder
+    mode: rw_mount
+
+# Resources
+resources:
+  instance_count: 1
+
+# Distribution (for multi-GPU if available)
+distribution:
+  type: pytorch
+  process_count_per_instance: 1
+
+# Tags for tracking
+tags:
+  project: weaver
+  model_type: distilbert
+  task: sensitivity_classification

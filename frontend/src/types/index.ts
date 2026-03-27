@@ -76,6 +76,7 @@ export interface ClassificationResult {
   total_findings?: number;
   extracted_text?: string | null;
   guest?: boolean;
+  model_version?: string;
 }
 
 export interface GuestClassificationResult extends Omit<ClassificationResult, 'classification_id'> {

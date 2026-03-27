@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { classifyApi, profileApi } from '../api';
+import { analyticsApi, classifyApi, profileApi } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { ChartCard, SensitivityPieChart, ActivityBarChart } from '../components/DashboardCharts';
 import type { ClassificationRecord, ProfileActivityItem, ProfileStats } from '../types';
 import { formatRelativeTime, humanizeAction } from '../utils/formatters';
 
@@ -18,16 +19,39 @@ const LEVEL_LABEL: Record<string, string> = {
 
 const EMPTY_STATS: ProfileStats = { total_classifications: 0, total_encryptions: 0, total_shares: 0, active_shares: 0 };
 
+interface UserDashboardData {
+  total_classifications: number;
+  classifications_this_week: number;
+  total_encryptions: number;
+  encryptions_this_week: number;
+  active_shares: number;
+  sensitivity_distribution: {
+    public: number;
+    internal: number;
+    confidential: number;
+    highly_sensitive: number;
+  };
+  daily_activity: Array<{
+    date: string;
+    day: string;
+    classifications: number;
+    encryptions: number;
+  }>;
+}
+
 export default function UserDashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState<ProfileStats>(EMPTY_STATS);
   const [activity, setActivity] = useState<ProfileActivityItem[]>([]);
   const [historyRows, setHistoryRows] = useState<ClassificationRecord[]>([]);
+  const [dashboardData, setDashboardData] = useState<UserDashboardData | null>(null);
 
   useEffect(() => {
     profileApi.stats().then(r => setStats(r.data)).catch(() => {});
     profileApi.activity(1).then(r => setActivity(r.data.items.slice(0, 6))).catch(() => {});
     classifyApi.history({ page: 1, limit: 50 }).then(r => setHistoryRows(r.data.items)).catch(() => {});
+    // Fetch unified dashboard data (role-based)
+    analyticsApi.dashboard().then(r => setDashboardData(r.data)).catch(() => {});
   }, []);
 
   const distribution = useMemo(() => {
@@ -39,7 +63,6 @@ export default function UserDashboard() {
 
   const secScore = (user?.mfa_enabled ? 70 : 40) + (stats.active_shares === 0 ? 20 : 10) + (stats.total_encryptions > 0 ? 10 : 0);
   const scoreColor = secScore >= 80 ? 'var(--accent-green)' : secScore >= 60 ? 'var(--accent-amber)' : 'var(--accent-red)';
-  const initials = user?.full_name?.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase() ?? '?';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -76,6 +99,20 @@ export default function UserDashboard() {
       </div>
 
       {/* Middle row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+
+        {/* Activity Chart */}
+        <ChartCard title="Your Activity (Last 7 Days)" subtitle="Classifications and encryptions">
+          <ActivityBarChart data={dashboardData?.daily_activity || []} />
+        </ChartCard>
+
+        {/* Distribution Pie Chart */}
+        <ChartCard title="Sensitivity Distribution" subtitle="Your classification breakdown">
+          <SensitivityPieChart data={dashboardData?.sensitivity_distribution || { public: 0, internal: 0, confidential: 0, highly_sensitive: 0 }} />
+        </ChartCard>
+      </div>
+
+      {/* Distribution Bar + Security */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 16 }}>
 
         {/* Distribution */}

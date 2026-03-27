@@ -1,0 +1,21 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+type: command
+display_name: weaver_classifier_simple
+experiment_name: weaver-sensitivity-classification
+description: Train TF-IDF + Logistic Regression classifier (fast, reliable)
+
+compute: azureml:weaver-cpu-cluster
+
+environment: azureml:AzureML-sklearn-1.0-ubuntu20.04-py38-cpu@latest
+
+code: E:\MTech\MTech Sem2\Cloud\Project\Weaver\backend\ml_training\src
+
+command: >-
+  pip install mlflow azureml-mlflow &&
+  python train_simple.py
+  --output-dir outputs
+  --samples-per-class 200
+
+resources:
+  instance_count: 1
+

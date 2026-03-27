@@ -373,7 +373,7 @@ const PORTFOLIO_CARDS = [
 const WORDS = ['Encryption.', 'Privacy.', 'Protection.', 'Compliance.'];
 function useTyping() {
   const [word, setWord] = useState(WORDS[0]);
-  const [idx, setIdx] = useState(0);
+  const [, setIdx] = useState(0);
   useEffect(() => {
     const t = setInterval(() => {
       setIdx(i => { const n = (i + 1) % WORDS.length; setWord(WORDS[n]); return n; });
@@ -388,7 +388,7 @@ function useTyping() {
 ────────────────────────────────────────── */
 export default function LandingPage() {
   const typingWord = useTyping();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [, setMenuOpen] = useState(false);
   useReveal();
   useFillText();
 

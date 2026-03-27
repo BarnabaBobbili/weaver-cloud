@@ -1,0 +1,15 @@
+# FastAPI server
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+
+# ML/NLP
+torch==2.1.2
+transformers==4.36.2
+sentencepiece==0.1.99
+accelerate==0.25.0
+
+# Utilities
+numpy==1.26.3
+httpx==0.26.0
+python-multipart==0.0.6

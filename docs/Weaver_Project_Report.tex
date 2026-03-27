@@ -1,0 +1,282 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{setspace}
+\usepackage{graphicx}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  urlcolor=blue
+}
+
+\setstretch{1.2}
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection.}{0.5em}{}
+
+% Font aliases used by the provided front page block
+\newcommand{\tnr}{\rmfamily}
+\newcommand{\calibriLight}{\sffamily}
+
+\begin{document}
+
+  \begin{titlepage}
+  \centering
+
+  {\tnr\fontsize{16}{12}\selectfont AI-DRIVEN ADAPTIVE CRYPTOGRAPHIC POLICY \par ENGINE FOR SECURE DATA SHARING\par}
+
+  \vspace{0.3cm}
+  {\tnr\fontsize{15}{14}\selectfont
+  Project Report\par
+  submitted in partial fulfilment for the degree of\par
+  Master of Technology\par
+  Under the\par
+  Faculty of Engineering\par
+  }
+
+  \vspace{1.0cm}
+  {\tnr\fontsize{14}{17}\selectfont\itshape Submitted by\par}
+
+  \vspace{0.5cm}
+  {\calibriLight\fontsize{13}{14}\selectfont BARNABA BOBBILI\par}
+  {\calibriLight\fontsize{13}{14}\selectfont CB.SC.P2CSE25002\par}
+
+  \vspace{0.9cm}
+  \includegraphics[width=15.67cm,height=4.0cm]{Picture1.jpg}
+
+  \vspace{0.9cm}
+  {\tnr\fontsize{15}{18}\selectfont
+  DEPARTMENT OF COMPUTER SCIENCE AND ENGINEERING\par
+  AMRITA SCHOOL OF COMPUTING,\par
+  AMRITA VISHWA VIDYAPEETHAM,\par
+  }
+
+  \vfill
+  {\tnr\fontsize{15}{18}\selectfont March, 2026\par}
+  {\tnr\fontsize{15}{18}\selectfont COIMATORE CAMPUS\par}
+
+  \end{titlepage}
+
+\pagenumbering{roman}
+\tableofcontents
+\newpage
+\pagenumbering{arabic}
+
+\section{Abstract}
+
+Weaver is an AI-driven adaptive cryptographic policy engine designed to secure data sharing workflows by combining sensitivity-aware classification with policy-enforced encryption controls. The project addresses a practical gap in enterprise systems where security enforcement is often static, while data risk and user context are dynamic. The implementation provides a full-stack platform with authentication, multi-factor authentication (MFA), role-based access control, classification, encryption/decryption, secure sharing, administration, and analytics support. The solution is deployed on Azure using managed services for compute, data, secrets, messaging, machine learning, observability, and analytics. This report presents the problem context, project objectives, module-level architecture, cloud service mapping, and detailed project execution steps.
+
+\section{Introduction}
+
+Digital systems increasingly process mixed-sensitivity data, including public records, internal business information, confidential documents, and highly sensitive payloads. Applying one fixed security configuration to all categories leads to either over-protection (high cost and friction) or under-protection (high risk). Weaver was built to operationalize adaptive cryptographic enforcement where security controls are selected based on data sensitivity and governance policy.
+
+The project aligns security engineering, cloud-native architecture, and applied machine learning. It is designed to be practical for real application pipelines where users, data, and policy constraints change continuously.
+
+\section{Problem Statement}
+
+The central problem solved by Weaver is:
+
+\begin{quote}
+How can a data sharing platform automatically and reliably apply the correct cryptographic protection level for each payload while preserving usability, enforceability, and auditability?
+\end{quote}
+
+Key pain points in conventional systems:
+
+\begin{enumerate}[leftmargin=1.4em]
+  \item Uniform security policy for heterogeneous data risk.
+  \item Weak coupling between identity posture (for example MFA status) and cryptographic action authorization.
+  \item Limited audit visibility for security-critical operations.
+  \item Fragmented analytics for operational and compliance decisions.
+\end{enumerate}
+
+\section{Project Objectives}
+
+The project objectives are:
+
+\begin{enumerate}[leftmargin=1.4em]
+  \item Build a secure end-to-end data handling platform for classification, encryption/decryption, and sharing.
+  \item Implement policy-driven cryptographic adaptation based on sensitivity classes.
+  \item Enforce role-based access and MFA-aware controls for high-risk operations.
+  \item Deploy the platform in a cloud-native architecture on Azure with managed services.
+  \item Provide observability, audit trails, and analytics integration suitable for governance workflows.
+\end{enumerate}
+
+\section{Project Modules}
+
+\subsection{Backend Module (FastAPI)}
+
+The backend implements business logic and security enforcement:
+
+\begin{itemize}[leftmargin=1.4em]
+  \item Authentication, authorization, and token lifecycle management.
+  \item MFA setup, verification, disable, and recovery-code flows.
+  \item Sensitivity classification endpoints for text and file workflows.
+  \item Policy-based encryption/decryption services.
+  \item Secure sharing and guest retrieval endpoints.
+  \item Administrative APIs for user, policy, and compliance operations.
+  \item Health, readiness, and liveness endpoints for operational reliability.
+\end{itemize}
+
+\subsection{Frontend Module (React + TypeScript)}
+
+The frontend provides role-aware user interaction:
+
+\begin{itemize}[leftmargin=1.4em]
+  \item Public pages: landing, login, registration, and token-based decrypt view.
+  \item Authenticated pages: dashboard, classify, history, shares, profile, and help.
+  \item Admin pages: users, policies, shares, compliance, and audit-oriented views.
+  \item Analyst pages: analytics and benchmark-oriented workflows.
+\end{itemize}
+
+\subsection{Security and Governance Module}
+
+Security controls include:
+
+\begin{itemize}[leftmargin=1.4em]
+  \item RBAC with \texttt{admin}, \texttt{analyst}, and \texttt{viewer} roles.
+  \item MFA (TOTP-based) for elevated protection paths.
+  \item Rate limiting, session timeout middleware, and security headers.
+  \item Audit and notification pipeline for critical events.
+\end{itemize}
+
+\subsection{Data, Messaging, and Analytics Module}
+
+\begin{itemize}[leftmargin=1.4em]
+  \item Azure PostgreSQL for transactional persistence.
+  \item Blob storage for large encrypted payloads.
+  \item Service Bus queues for asynchronous processing and decoupling.
+  \item Synapse export path for analytical workloads and Power BI integration.
+\end{itemize}
+
+\section{Azure Services Used}
+
+The production environment in resource group \texttt{weaver-rg} uses the services below.
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{3.0cm} >{\raggedright\arraybackslash}p{3.6cm} >{\raggedright\arraybackslash}p{4.2cm} >{\raggedright\arraybackslash}p{4.1cm}}
+\toprule
+\textbf{Category} & \textbf{Azure Service} & \textbf{Resource Name(s)} & \textbf{Purpose} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Category} & \textbf{Azure Service} & \textbf{Resource Name(s)} & \textbf{Purpose} \\
+\midrule
+\endhead
+Compute & Container Apps & \texttt{weaver-env}, \texttt{weaver-backend} & Scalable backend runtime \\
+Frontend & Static Web Apps & \texttt{weaver-frontend} & Production web UI hosting \\
+Database & PostgreSQL Flexible Server & \texttt{weaver-db-prod} & Primary OLTP data store \\
+Secrets & Key Vault & \texttt{weaver-kv-ijbkmp25} & Secret management and retrieval \\
+Identity & Managed Identity & \texttt{weaver-backend-identity} & Service-to-service authentication \\
+Storage & Storage Account & \texttt{weaverstorageprod} & Encrypted object/blob storage \\
+Messaging & Service Bus & \texttt{weaver-servicebus-prod} & Async queue-based processing \\
+Monitoring & Application Insights & \texttt{weaver-appinsights} & Telemetry and diagnostics \\
+API Governance & API Management & \texttt{weaver-apim} & Managed API gateway layer \\
+Machine Learning & Azure Machine Learning & \texttt{weaver-ml-workspace} & Model management and online endpoints \\
+Analytics & Azure Synapse & \texttt{weaver-synapse-ws} & Analytics query and warehouse path \\
+BI Capacity & Power BI Dedicated & \texttt{weaveranalytics} & Dedicated BI compute capacity \\
+\bottomrule
+\end{longtable}
+
+\subsection*{Operational Endpoints}
+
+\begin{itemize}[leftmargin=1.4em]
+  \item Frontend: \url{https://salmon-meadow-04fa55300.1.azurestaticapps.net}
+  \item Backend: \url{https://weaver-backend.whitehill-eea76820.centralindia.azurecontainerapps.io}
+  \item API Gateway: \url{https://weaver-apim.azure-api.net}
+  \item PostgreSQL FQDN: \texttt{weaver-db-prod.postgres.database.azure.com}
+  \item Synapse serverless SQL (Power BI server value): \texttt{weaver-synapse-ws-ondemand.sql.azuresynapse.net}
+\end{itemize}
+
+\section{Project Execution Steps}
+
+The implementation was executed through the following steps.
+
+\subsection{Step 1: Foundation and Identity Setup}
+
+\begin{enumerate}[leftmargin=1.4em]
+  \item Create the Azure resource group and register required providers.
+  \item Provision user-assigned managed identity for backend workloads.
+  \item Configure role assignments for Key Vault, storage, and dependent services.
+\end{enumerate}
+
+\subsection{Step 2: Data and Security Baseline}
+
+\begin{enumerate}[leftmargin=1.4em]
+  \item Provision Key Vault and initialize required secret keys.
+  \item Provision PostgreSQL Flexible Server and application database.
+  \item Configure secure connectivity, firewall rules, and SSL-required DB access.
+  \item Provision storage containers for encrypted payload artifacts.
+\end{enumerate}
+
+\subsection{Step 3: Backend Container Deployment}
+
+\begin{enumerate}[leftmargin=1.4em]
+  \item Build and publish backend container image.
+  \item Deploy backend application to Azure Container Apps.
+  \item Inject runtime bootstrap configuration (identity, Key Vault URL, CORS).
+  \item Validate backend availability using health endpoints.
+\end{enumerate}
+
+\subsection{Step 4: Frontend Deployment}
+
+\begin{enumerate}[leftmargin=1.4em]
+  \item Build frontend assets with production backend endpoint.
+  \item Deploy to Azure Static Web Apps.
+  \item Validate route handling and backend API connectivity.
+\end{enumerate}
+
+\subsection{Step 5: Integration Services Enablement}
+
+\begin{enumerate}[leftmargin=1.4em]
+  \item Configure Service Bus queue channels for asynchronous workflows.
+  \item Enable Application Insights telemetry and diagnostics.
+  \item Configure API Management gateway policies.
+  \item Configure Azure ML workspace and online endpoint integration.
+  \item Configure Synapse integration path for analytics export.
+\end{enumerate}
+
+\subsection{Step 6: Data Migration and Validation}
+
+\begin{enumerate}[leftmargin=1.4em]
+  \item Export source data from Supabase direct PostgreSQL connection.
+  \item Import into Azure PostgreSQL using compatibility-safe restore procedure.
+  \item Verify schema availability and table-level record consistency.
+  \item Execute user workflow checks for authentication, MFA, classification, encryption, and administration.
+\end{enumerate}
+
+\section{Results and Discussion}
+
+The deployed platform satisfies the primary engineering goals:
+
+\begin{itemize}[leftmargin=1.4em]
+  \item Adaptive cryptographic logic is operational across key business flows.
+  \item Security controls (RBAC and MFA) are integrated with runtime actions.
+  \item Cloud architecture provides modular scalability and managed operations.
+  \item Monitoring and analytics integration support operational visibility.
+\end{itemize}
+
+The implementation also highlights practical cloud engineering considerations:
+
+\begin{itemize}[leftmargin=1.4em]
+  \item Service naming consistency across scripts and runtime variables is critical.
+  \item Data migration between PostgreSQL variants may require compatibility filtering.
+  \item Academic and operational documentation should be maintained as versioned artifacts.
+\end{itemize}
+
+\section{Conclusion and Future Work}
+
+Weaver demonstrates a viable cloud-native model for adaptive cryptographic policy enforcement. The system combines application security engineering, policy control, and cloud service integration to produce a practical secure data-sharing platform.
+
+Future improvements include:
+\begin{itemize}[leftmargin=1.4em]
+  \item Expanded automated integration tests across cloud dependencies.
+  \item Additional compliance controls and reporting templates.
+  \item Enhanced network hardening through private endpoints and tighter segmentation.
+  \item Model drift monitoring and periodic ML retraining governance.
+\end{itemize}
+
+\end{document}

@@ -47,19 +47,27 @@ if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 Set-Location $frontendPath
 Compress-Archive -Path "src", "public", "package.json", "package-lock.json", "index.html", "vite.config.ts", "tsconfig.json", "tsconfig.app.json", "tsconfig.node.json" -DestinationPath $zipPath -Force
 
-# Deploy using SWA CLI (builds in Azure)
-Write-Host "Deploying to Azure Static Web Apps (builds in cloud)..." -ForegroundColor Yellow
+# Build frontend locally
+Write-Host "Building frontend..." -ForegroundColor Yellow
+Set-Location $frontendPath
 
-# Install SWA CLI if not installed
-$swaPath = npm root -g
-$swaInstalled = Test-Path "$swaPath\@azure\static-web-apps-cli"
-if (-not $swaInstalled) {
-    Write-Host "Installing SWA CLI globally..." -ForegroundColor Yellow
-    npm install -g @azure/static-web-apps-cli
-}
+# Set backend URL for build
+$env:VITE_API_URL = $BACKEND_URL
 
-# Deploy with corrected arguments
-npx swa deploy --deployment-token $DEPLOYMENT_TOKEN --app-location $frontendPath --output-location "dist" --env production
+# Install dependencies
+npm install
+
+# Build
+npm run build
+
+# Deploy the built dist folder to Azure Static Web Apps
+Write-Host "Deploying to Azure Static Web Apps..." -ForegroundColor Yellow
+
+# Install SWA CLI if needed
+npm install -g @azure/static-web-apps-cli 2>&1
+
+# Deploy the pre-built dist folder
+npx swa deploy ./dist --deployment-token $DEPLOYMENT_TOKEN --env production
 
 # Cleanup
 Remove-Item $zipPath -Force 2>$null

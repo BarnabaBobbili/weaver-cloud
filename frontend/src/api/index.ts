@@ -191,6 +191,33 @@ export const analyticsApi = {
 
   adminSecurityAlerts: () =>
     client.get<AdminSecurityAlerts>('/api/analytics/admin/security-alerts'),
+
+  // Unified dashboard endpoint - automatically returns role-based data
+  dashboard: () =>
+    client.get<{
+      total_classifications: number;
+      classifications_this_week: number;
+      total_encryptions: number;
+      encryptions_this_week: number;
+      total_users?: number; // Only present for admin users
+      active_shares: number;
+      sensitivity_distribution: {
+        public: number;
+        internal: number;
+        confidential: number;
+        highly_sensitive: number;
+      };
+      daily_activity: Array<{
+        date: string;
+        day: string;
+        classifications: number;
+        encryptions: number;
+      }>;
+      ml_model_source?: string; // Only present for admin users
+    }>('/api/analytics'),
+
+  triggerSynapseExport: () =>
+    client.post<{ status: string; message: string; details?: unknown }>('/api/analytics/synapse/export'),
 };
 
 export const adminApi = {

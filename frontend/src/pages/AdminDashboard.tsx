@@ -1,11 +1,34 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { adminApi, analyticsApi } from '../api';
+import { ChartCard, SensitivityPieChart, ActivityBarChart } from '../components/DashboardCharts';
 import type {
   AdminHealth, AdminSecurityAlerts, AdminUserSummary,
   AnalyticsOverview, AuditLog, ComplianceReport, SensitivityDistribution,
 } from '../types';
 import { formatRelativeTime, humanizeAction } from '../utils/formatters';
+
+interface AdminDashboardData {
+  total_classifications: number;
+  classifications_this_week: number;
+  total_encryptions: number;
+  encryptions_this_week: number;
+  total_users?: number;
+  active_shares: number;
+  sensitivity_distribution: {
+    public: number;
+    internal: number;
+    confidential: number;
+    highly_sensitive: number;
+  };
+  daily_activity: Array<{
+    date: string;
+    day: string;
+    classifications: number;
+    encryptions: number;
+  }>;
+  ml_model_source?: string;
+}
 
 const EMPTY_OVERVIEW: AnalyticsOverview = {
   total_classifications: 0, total_encryptions: 0, active_shares: 0, total_users: 0,
@@ -27,6 +50,7 @@ export default function AdminDashboard() {
   const [distribution, setDistribution] = useState<SensitivityDistribution>(EMPTY_DIST);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [exportingAudit, setExportingAudit] = useState(false);
+  const [adminDashboardData, setAdminDashboardData] = useState<AdminDashboardData | null>(null);
 
   useEffect(() => {
     analyticsApi.overview().then(r => setOverview(r.data)).catch(() => {});
@@ -36,6 +60,8 @@ export default function AdminDashboard() {
     analyticsApi.sensitivityDistribution('30D').then(r => setDistribution(r.data)).catch(() => {});
     adminApi.complianceReport().then(r => setReport(r.data)).catch(() => {});
     adminApi.adminAuditLogs({ page: 1, limit: 5 }).then(r => setLogs(r.data.items)).catch(() => {});
+    // Fetch unified dashboard data (role-based, includes admin data)
+    analyticsApi.dashboard().then(r => setAdminDashboardData(r.data)).catch(() => {});
   }, []);
 
   const distRows = useMemo(() => {
@@ -102,6 +128,45 @@ export default function AdminDashboard() {
           </div>
         ))}
       </div>
+
+      {/* Charts Row - Activity and Distribution */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <ChartCard title="System Activity (Last 7 Days)" subtitle="All users combined">
+          <ActivityBarChart data={adminDashboardData?.daily_activity || []} />
+        </ChartCard>
+        <ChartCard title="Classification Distribution" subtitle="System-wide breakdown">
+          <SensitivityPieChart data={adminDashboardData?.sensitivity_distribution || { public: 0, internal: 0, confidential: 0, highly_sensitive: 0 }} />
+        </ChartCard>
+      </div>
+
+      {/* ML Model Status Banner */}
+      {adminDashboardData?.ml_model_source && (
+        <div style={{ 
+          padding: '12px 16px', 
+          background: adminDashboardData.ml_model_source === 'cloud_trained' 
+            ? 'linear-gradient(90deg, rgba(34,197,94,0.1) 0%, rgba(59,130,246,0.1) 100%)' 
+            : 'rgba(245,158,11,0.1)',
+          borderRadius: 8,
+          border: `1px solid ${adminDashboardData.ml_model_source === 'cloud_trained' ? 'rgba(34,197,94,0.3)' : 'rgba(245,158,11,0.3)'}`,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12
+        }}>
+          <span style={{ fontSize: 20 }}>
+            {adminDashboardData.ml_model_source === 'cloud_trained' ? '☁️' : '💻'}
+          </span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+              ML Model: {adminDashboardData.ml_model_source === 'cloud_trained' ? 'Azure ML Cloud-Trained' : 'Local Model'}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              {adminDashboardData.ml_model_source === 'cloud_trained' 
+                ? 'Using TF-IDF classifier trained in Azure Machine Learning' 
+                : 'Using local fallback model'}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* System health + user summary + security alerts (3-col) */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>

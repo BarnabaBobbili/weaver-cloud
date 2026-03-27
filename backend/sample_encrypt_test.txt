@@ -1,0 +1,3 @@
+Employee salary: 90000 INR
+Project Apollo budget: confidential
+SSN 123-45-6789

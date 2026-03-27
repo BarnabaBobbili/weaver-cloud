@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chart Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Chart Components Test</h1>
+        
+        <div class="status">
+            <h3>Chart Components Location Check:</h3>
+            <p>✅ Charts are in AnalyticsPage.tsx at lines 266-274</p>
+            <p>✅ Imports are correct (line 7)</p>
+            <p>✅ Components handle empty data (show "No data yet" message)</p>
+        </div>
+
+        <div class="status">
+            <h3>What Should Happen with Empty Data:</h3>
+            <p><strong>Activity Bar Chart:</strong> Should show "No activity data yet"</p>
+            <p><strong>Sensitivity Pie Chart:</strong> Should show "No classification data yet"</p>
+        </div>
+
+        <div class="status">
+            <h3>To Verify Charts Are Rendering:</h3>
+            <ol>
+                <li>Open browser DevTools (F12)</li>
+                <li>Navigate to /analytics page</li>
+                <li>Check Console tab for errors</li>
+                <li>Check Network tab - verify API call to /api/analytics</li>
+                <li>Look for the chart cards with titles "System Activity (Last 7 Days)" and "Sensitivity Distribution"</li>
+            </ol>
+        </div>
+
+        <div class="status" style="background: #fff3e0; border-color: #ff9800;">
+            <h3>⚠️ Important Notes:</h3>
+            <p>1. Charts require authentication - must be logged in as admin or analyst</p>
+            <p>2. Even with no data, chart card containers should be visible</p>
+            <p>3. Check browser cache - hard refresh (Ctrl+Shift+R) may be needed</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -219,12 +219,20 @@ export default function ClassifyPage() {
                   {result.level.toUpperCase()}
                 </span>
               </div>
-              <div className="row-between" style={{ marginBottom: 16 }}>
+              <div className="row-between" style={{ marginBottom: 12 }}>
                 <span style={{ fontSize: 12, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Confidence</span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)' }}>
                   {(result.confidence * 100).toFixed(1)}%
                 </span>
               </div>
+              {result.model_version && (
+                <div className="row-between" style={{ marginBottom: 16 }}>
+                  <span style={{ fontSize: 12, textTransform: 'uppercase', color: 'var(--text-muted)' }}>ML Model</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--accent-blue)', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: 4 }}>
+                    {result.model_version.includes('ml_service') ? 'DistilBERT (Cloud)' : result.model_version}
+                  </span>
+                </div>
+              )}
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7 }}>{result.explanation_summary}</div>
 
               <div style={{ marginTop: 18 }}>

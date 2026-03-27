@@ -1,0 +1,58 @@
+# Core Framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# Database
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+aiosqlite==0.22.1
+alembic==1.14.0
+
+# Pydantic / Settings
+pydantic==2.10.4
+pydantic-settings==2.7.0
+email-validator==2.2.0
+
+# Auth & Security
+PyJWT==2.10.1
+passlib[argon2]==1.7.4
+argon2-cffi==23.1.0
+pyotp==2.9.0
+cryptography==44.0.0
+slowapi==0.1.9
+
+# ML & XAI
+scikit-learn==1.6.0
+lime==0.2.0.1
+shap==0.46.0
+faker==33.1.0
+joblib==1.4.2
+numpy==1.26.4
+pandas==2.2.3
+pyarrow==18.1.0
+
+# Document Processing
+pdfplumber==0.11.4
+python-docx==1.1.2
+
+# Utilities
+python-dotenv==1.0.1
+httpx==0.28.1
+qrcode[pil]==8.0
+
+# Azure Cloud Services
+azure-identity==1.19.0
+azure-keyvault-secrets==4.9.0
+azure-storage-blob==12.24.0
+azure-storage-file-datalake==12.18.0
+azure-servicebus==7.13.0
+azure-ai-ml==1.23.1
+azure-monitor-opentelemetry==1.6.4
+opencensus-ext-azure==1.1.14
+opentelemetry-instrumentation-fastapi==0.49b2
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.25.2
+anyio==4.8.0
