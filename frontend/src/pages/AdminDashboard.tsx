@@ -143,26 +143,34 @@ export default function AdminDashboard() {
       {adminDashboardData?.ml_model_source && (
         <div style={{ 
           padding: '12px 16px', 
-          background: adminDashboardData.ml_model_source === 'cloud_trained' 
-            ? 'linear-gradient(90deg, rgba(34,197,94,0.1) 0%, rgba(59,130,246,0.1) 100%)' 
-            : 'rgba(245,158,11,0.1)',
+          background: adminDashboardData.ml_model_source === 'local'
+            ? 'rgba(245,158,11,0.1)'
+            : 'linear-gradient(90deg, rgba(34,197,94,0.1) 0%, rgba(59,130,246,0.1) 100%)',
           borderRadius: 8,
-          border: `1px solid ${adminDashboardData.ml_model_source === 'cloud_trained' ? 'rgba(34,197,94,0.3)' : 'rgba(245,158,11,0.3)'}`,
+          border: `1px solid ${adminDashboardData.ml_model_source === 'local' ? 'rgba(245,158,11,0.3)' : 'rgba(34,197,94,0.3)'}`,
           display: 'flex',
           alignItems: 'center',
           gap: 12
         }}>
           <span style={{ fontSize: 20 }}>
-            {adminDashboardData.ml_model_source === 'cloud_trained' ? '☁️' : '💻'}
+            {adminDashboardData.ml_model_source === 'local' ? '💻' : '☁️'}
           </span>
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-              ML Model: {adminDashboardData.ml_model_source === 'cloud_trained' ? 'Azure ML Cloud-Trained' : 'Local Model'}
+              ML Model: {
+                adminDashboardData.ml_model_source === 'ml_service' 
+                  ? 'Azure ML Service (DistilBERT)' 
+                  : adminDashboardData.ml_model_source === 'cloud_trained' 
+                    ? 'Azure ML Cloud-Trained' 
+                    : 'Local Model Fallback'
+              }
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-              {adminDashboardData.ml_model_source === 'cloud_trained' 
-                ? 'Using TF-IDF classifier trained in Azure Machine Learning' 
-                : 'Using local fallback model'}
+              {adminDashboardData.ml_model_source === 'ml_service'
+                ? 'Using DistilBERT zero-shot classifier via Azure Container Apps' 
+                : adminDashboardData.ml_model_source === 'cloud_trained' 
+                  ? 'Using TF-IDF classifier trained in Azure Machine Learning' 
+                  : 'Using local fallback model'}
             </div>
           </div>
         </div>
