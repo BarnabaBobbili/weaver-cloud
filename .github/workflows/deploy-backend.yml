@@ -9,6 +9,10 @@ on:
       - '.github/workflows/deploy-backend.yml'
   workflow_dispatch:
 
+permissions:
+  id-token: write
+  contents: read
+
 env:
   REGISTRY: weaveracr.azurecr.io
   IMAGE_NAME: weaver-backend
@@ -40,10 +44,12 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
       
-      - name: Login to Azure CLI
+      - name: Login to Azure CLI (OIDC)
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       
       - name: Deploy to Azure Container Apps
         run: |

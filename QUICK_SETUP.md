@@ -1,163 +1,92 @@
-# Quick Setup Commands for Weaver CI/CD
+# Quick Setup for GitHub Actions (OIDC)
 
-**YOUR AZURE SUBSCRIPTION ID:** `7e28e79f-6729-47d7-accc-38b7c1cefdf1`
+Use this if `az ad sp create-for-rbac` fails with insufficient directory privileges.
 
-## Step-by-Step Setup
+## Values for this project
 
-### 1️⃣ Create Azure Service Principal
+- Subscription ID: `7e28e79f-6729-47d7-accc-38b7c1cefdf1`
+- Tenant ID: `00f9cda3-075e-44e5-aa0b-aba3add6539f`
+- Resource group: `weaver-rg`
+- Repo: `BarnabaBobbili/weaver-cloud`
 
-Run this command in your terminal:
+## What was set up
+
+An Azure user-assigned managed identity was created and linked to GitHub OIDC:
+
+- Identity name: `weaver-github-oidc`
+- Client ID: `bdc12812-af72-4a7f-9a8b-0aa6fa96755c`
+- Principal ID: `d4b8a35a-e61f-49c6-83f5-2518f1ccf8c1`
+- Federated credential subject: `repo:BarnabaBobbili/weaver-cloud:ref:refs/heads/main`
+
+## Add these GitHub secrets
+
+Go to `https://github.com/BarnabaBobbili/weaver-cloud/settings/secrets/actions` and add:
+
+1. `AZURE_CLIENT_ID`
+   - Value: `bdc12812-af72-4a7f-9a8b-0aa6fa96755c`
+
+2. `AZURE_TENANT_ID`
+   - Value: `00f9cda3-075e-44e5-aa0b-aba3add6539f`
+
+3. `AZURE_SUBSCRIPTION_ID`
+   - Value: `7e28e79f-6729-47d7-accc-38b7c1cefdf1`
+
+4. `ACR_USERNAME`
+   - Get from:
+   ```bash
+   az acr credential show --name weaveracr --query username -o tsv
+   ```
+
+5. `ACR_PASSWORD`
+   - Get from:
+   ```bash
+   az acr credential show --name weaveracr --query "passwords[0].value" -o tsv
+   ```
+
+6. `AZURE_STATIC_WEB_APPS_API_TOKEN`
+   - Get from:
+   ```bash
+   az staticwebapp secrets list --name weaver-frontend --resource-group weaver-rg --query "properties.apiKey" -o tsv
+   ```
+
+## Workflows already updated
+
+These workflows now use OIDC (`azure/login@v2` with client/tenant/subscription secrets):
+
+- `.github/workflows/deploy-backend.yml`
+- `.github/workflows/deploy-frontend.yml`
+- `.github/workflows/deploy-ml-service.yml`
+
+## Run and verify
+
+1. Open `https://github.com/BarnabaBobbili/weaver-cloud/actions`
+2. Run in this order:
+   - `Deploy ML Service to Azure Container Apps`
+   - `Deploy Backend to Azure Container Apps`
+   - `Deploy Frontend to Azure Static Web Apps`
+3. Verify URLs:
+   - Backend health: `https://weaver-backend.whitehill-eea76820.centralindia.azurecontainerapps.io/health`
+   - ML health: `https://weaver-ml.whitehill-eea76820.centralindia.azurecontainerapps.io/health`
+   - Frontend: `https://salmon-meadow-04fa55300.1.azurestaticapps.net`
+
+## If you need to recreate OIDC setup manually
 
 ```bash
-az ad sp create-for-rbac \
-  --name "weaver-github-actions" \
-  --role contributor \
-  --scopes /subscriptions/7e28e79f-6729-47d7-accc-38b7c1cefdf1/resourceGroups/weaver-rg \
-  --sdk-auth
-```
+az identity create --resource-group weaver-rg --name weaver-github-oidc --location centralindia
 
-**📋 Copy the ENTIRE JSON output** - you'll need it for GitHub Secrets.
+MSYS_NO_PATHCONV=1 az role assignment create \
+  --assignee-object-id <principal-id> \
+  --assignee-principal-type ServicePrincipal \
+  --role Contributor \
+  --scope /subscriptions/7e28e79f-6729-47d7-accc-38b7c1cefdf1/resourceGroups/weaver-rg
 
-It will look like this:
-```json
-{
-  "clientId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-  "clientSecret": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-  "subscriptionId": "7e28e79f-6729-47d7-accc-38b7c1cefdf1",
-  "tenantId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-  ...
-}
-```
-
----
-
-### 2️⃣ Get Azure Container Registry Credentials
-
-Run this command and copy the output values:
-
-```bash
-az acr credential show --name weaveracr
-```
-
-- **ACR_USERNAME:** Use the `username` value
-- **ACR_PASSWORD:** Use one of the `passwords[].value` values
-
----
-
-### 3️⃣ Get Static Web App Deployment Token
-
-Run this command to get the full token:
-
-```bash
-az staticwebapp secrets list \
-  --name weaver-frontend \
+az identity federated-credential create \
+  --name github-main \
+  --identity-name weaver-github-oidc \
   --resource-group weaver-rg \
-  --query "properties.apiKey" -o tsv
+  --issuer https://token.actions.githubusercontent.com \
+  --subject repo:BarnabaBobbili/weaver-cloud:ref:refs/heads/main \
+  --audiences api://AzureADTokenExchange
 ```
 
-**📋 Copy the output** - you'll need it for GitHub Secrets.
-
----
-
-### 4️⃣ Add Secrets to GitHub
-
-Go to: **https://github.com/BarnabaBobbili/weaver-cloud/settings/secrets/actions**
-
-Click **"New repository secret"** for each of these:
-
-#### Secret 1: AZURE_CREDENTIALS
-- **Name:** `AZURE_CREDENTIALS`
-- **Value:** Paste the ENTIRE JSON from Step 1 (including `{` and `}`)
-
-#### Secret 2: ACR_USERNAME
-- **Name:** `ACR_USERNAME`
-- **Value:** `weaveracr`
-
-#### Secret 3: ACR_PASSWORD
-- **Name:** `ACR_PASSWORD`
-- **Value:** Paste the password from Step 2
-
-#### Secret 4: AZURE_STATIC_WEB_APPS_API_TOKEN
-- **Name:** `AZURE_STATIC_WEB_APPS_API_TOKEN`
-- **Value:** Paste the token from Step 3
-
----
-
-### 5️⃣ Test the CI/CD Pipeline
-
-Once secrets are added, test the deployment:
-
-#### Option A: Trigger Manually
-1. Go to **https://github.com/BarnabaBobbili/weaver-cloud/actions**
-2. Click on **"Deploy Backend to Azure Container Apps"**
-3. Click **"Run workflow"** → Select `main` → Click **"Run workflow"**
-
-#### Option B: Make a Test Commit
-```bash
-cd "E:\MTech\MTech Sem2\Cloud\Project\Weaver"
-
-# Make a small change
-echo "# CI/CD test" >> backend/README.md
-
-# Commit and push
-git add backend/README.md
-git commit -m "test: verify CI/CD pipeline"
-git push origin main
-```
-
-Then go to **https://github.com/BarnabaBobbili/weaver-cloud/actions** to watch it deploy!
-
----
-
-## ✅ Verification Checklist
-
-After setup, verify:
-
-- [ ] All 4 secrets are added in GitHub
-- [ ] Service principal was created successfully
-- [ ] You can manually trigger workflows
-- [ ] Test deployment completes successfully
-- [ ] Backend health check passes: https://weaver-backend.whitehill-eea76820.centralindia.azurecontainerapps.io/health
-- [ ] Frontend loads: https://salmon-meadow-04fa55300.1.azurestaticapps.net
-- [ ] ML Service health check passes: https://weaver-ml.whitehill-eea76820.centralindia.azurecontainerapps.io/health
-
----
-
-## 🔧 Troubleshooting
-
-### "Login failed" Error
-- Make sure `AZURE_CREDENTIALS` contains the **complete JSON** from Step 1
-- No extra spaces or formatting
-
-### "Unauthorized" ACR Error
-- Verify `ACR_USERNAME` is exactly: `weaveracr`
-- Verify `ACR_PASSWORD` is the full string (no spaces)
-
-### Workflow Doesn't Trigger
-- Make sure you pushed changes to the `main` branch
-- Check that files changed are in `backend/**`, `frontend/**`, or `ml-service/**`
-
-### Need Help?
-Check the full guide: `CICD_SETUP_GUIDE.md`
-
----
-
-## 📊 What Happens When You Push Code?
-
-### Changes in `backend/**`
-→ Builds Docker image → Pushes to ACR → Deploys to Container Apps → Runs health check
-
-### Changes in `frontend/**`
-→ Installs dependencies → Builds React app → Deploys to Static Web Apps → Updates CORS
-
-### Changes in `ml-service/**`
-→ Builds Docker image → Pushes to ACR → Deploys to Container Apps → Updates backend endpoint
-
----
-
-## 🚀 You're All Set!
-
-Once secrets are configured, every push to `main` will automatically deploy to Azure.
-
-**Repository:** https://github.com/BarnabaBobbili/weaver-cloud
-**Actions:** https://github.com/BarnabaBobbili/weaver-cloud/actions
+Note: In Git Bash on Windows, use `MSYS_NO_PATHCONV=1` for commands that include `/subscriptions/...`.
