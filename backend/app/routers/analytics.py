@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from math import ceil
+from pathlib import Path
 import logging
 import os
 import secrets
@@ -335,18 +336,43 @@ async def dashboard(
 
     # Determine ML model source (admin only)
     ml_model_source = None
+    ml_model_version = None
     if is_admin:
         ml_model_source = "local"
-        cloud_model_path = (
-            Path(__file__).parent.parent
-            / "ml_models"
-            / "cloud_trained"
-            / "sensitivity_classifier.joblib"
-        )
-        if cloud_model_path.exists():
-            ml_model_source = "cloud_trained"
-        elif os.environ.get("AZURE_ML_ENDPOINT"):
-            ml_model_source = "azure_endpoint"
+
+        # Check for ML service endpoint (highest priority - DistilBERT model)
+        ml_endpoint_url = os.environ.get("AZURE_ML_ENDPOINT_URL")
+        if ml_endpoint_url:
+            # Try to verify ML service is healthy
+            try:
+                import httpx
+
+                # Extract base URL from classify endpoint
+                base_url = ml_endpoint_url.replace("/classify", "")
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    health_response = await client.get(f"{base_url}/health")
+                    if health_response.status_code == 200:
+                        health_data = health_response.json()
+                        ml_model_source = "ml_service"
+                        ml_model_version = health_data.get(
+                            "model_version", "distilbert-mnli-v1.0"
+                        )
+            except Exception as e:
+                logger.warning(f"ML service health check failed: {e}")
+                # Fall through to check other sources
+
+        # Check for cloud-trained model (second priority)
+        if ml_model_source == "local":
+            cloud_model_path = (
+                Path(__file__).parent.parent
+                / "ml_models"
+                / "cloud_trained"
+                / "sensitivity_classifier.joblib"
+            )
+            if cloud_model_path.exists():
+                ml_model_source = "cloud_trained"
+            elif os.environ.get("AZURE_ML_ENDPOINT"):
+                ml_model_source = "azure_endpoint"
 
     result = {
         "total_classifications": total_cls,
@@ -366,6 +392,8 @@ async def dashboard(
     if is_admin:
         result["total_users"] = total_users
         result["ml_model_source"] = ml_model_source
+        if ml_model_version:
+            result["ml_model_version"] = ml_model_version
 
     return result
 
@@ -640,7 +668,9 @@ async def trigger_synapse_export(
     synapse = get_synapse_service()
 
     try:
-        result = await synapse.run_daily_etl(db, include_daily_rollup=include_daily_rollup)
+        result = await synapse.run_daily_etl(
+            db, include_daily_rollup=include_daily_rollup
+        )
         return {
             "status": "success",
             "message": "Data export completed",
@@ -664,7 +694,9 @@ async def trigger_synapse_export_internal(
     """
     expected_key = os.environ.get("SYNAPSE_SYNC_API_KEY", "")
     if not expected_key:
-        raise HTTPException(status_code=503, detail="SYNAPSE_SYNC_API_KEY is not configured")
+        raise HTTPException(
+            status_code=503, detail="SYNAPSE_SYNC_API_KEY is not configured"
+        )
     if not sync_key or not secrets.compare_digest(sync_key, expected_key):
         raise HTTPException(status_code=401, detail="Invalid sync key")
 
@@ -673,7 +705,9 @@ async def trigger_synapse_export_internal(
     synapse = get_synapse_service()
 
     try:
-        result = await synapse.run_daily_etl(db, include_daily_rollup=include_daily_rollup)
+        result = await synapse.run_daily_etl(
+            db, include_daily_rollup=include_daily_rollup
+        )
         return {
             "status": "success",
             "message": "Internal sync completed",
