@@ -342,7 +342,6 @@ async def dashboard(
 
         # Check for ML service endpoint (highest priority - DistilBERT model)
         ml_endpoint_url = os.environ.get("AZURE_ML_ENDPOINT_URL")
-        print(f"[DEBUG] ML endpoint URL from env: {ml_endpoint_url}")
 
         if ml_endpoint_url:
             # Try to verify ML service is healthy
@@ -351,23 +350,18 @@ async def dashboard(
 
                 # Extract base URL from classify endpoint
                 base_url = ml_endpoint_url.replace("/classify", "")
-                print(f"[DEBUG] Checking ML service health at: {base_url}/health")
 
                 async with httpx.AsyncClient(timeout=5.0) as client:
                     health_response = await client.get(f"{base_url}/health")
-                    print(
-                        f"[DEBUG] ML service response status: {health_response.status_code}"
-                    )
 
                     if health_response.status_code == 200:
                         health_data = health_response.json()
-                        print(f"[DEBUG] ML service health data: {health_data}")
                         ml_model_source = "ml_service"
                         ml_model_version = health_data.get(
                             "model_version", "distilbert-mnli-v1.0"
                         )
             except Exception as e:
-                print(f"[DEBUG] ML service health check failed: {e}")
+                logger.warning(f"ML service health check failed: {e}")
                 # Fall through to check other sources
 
         # Check for cloud-trained model (second priority)
@@ -382,10 +376,6 @@ async def dashboard(
                 ml_model_source = "cloud_trained"
             elif os.environ.get("AZURE_ML_ENDPOINT"):
                 ml_model_source = "azure_endpoint"
-
-        print(
-            f"[DEBUG] Final ML model source: {ml_model_source}, version: {ml_model_version}"
-        )
 
     result = {
         "total_classifications": total_cls,
