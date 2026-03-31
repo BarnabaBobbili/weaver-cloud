@@ -278,9 +278,15 @@ def _call_ml_service(text: str) -> tuple[str, float, str]:
     Falls back to local model if ML service is unavailable.
     """
     if not ML_SERVICE_URL:
-        # No ML service configured, use local model
-        ml_level, ml_confidence = ml_model.predict(text)
-        return ml_level, ml_confidence, ml_model.get_model_version()
+        # No ML service configured, use local model (or safe default on failure)
+        try:
+            ml_level, ml_confidence = ml_model.predict(text)
+            return ml_level, ml_confidence, ml_model.get_model_version()
+        except Exception as e:
+            logger.error(
+                f"Local model prediction failed (no ML endpoint configured): {e}"
+            )
+            return "confidential", 0.5, "fallback:safe-default"
 
     try:
         # Call ML service endpoint
@@ -305,8 +311,13 @@ def _call_ml_service(text: str) -> tuple[str, float, str]:
         logger.warning(f"ML Service call failed, using local model: {e}")
 
     # Fallback to local model
-    ml_level, ml_confidence = ml_model.predict(text)
-    return ml_level, ml_confidence, ml_model.get_model_version()
+    try:
+        ml_level, ml_confidence = ml_model.predict(text)
+        return ml_level, ml_confidence, ml_model.get_model_version()
+    except Exception as e:
+        # Never crash request path because model deserialization failed.
+        logger.error(f"Local model fallback failed, using safe default: {e}")
+        return "confidential", 0.5, "fallback:safe-default"
 
 
 def classify_text(text: str) -> dict:
