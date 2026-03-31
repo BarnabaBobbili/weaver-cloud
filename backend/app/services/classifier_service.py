@@ -418,7 +418,9 @@ def classify_text_detailed(text: str, source_label: str = "text") -> dict:
                 chunk_findings, key=lambda f: LEVEL_TO_INT.get(f["level"], 0)
             )["level"]
         else:
-            seg_level = "public"
+            # When no line-level PII is found in this segment, align with overall
+            # model classification instead of forcing "public".
+            seg_level = overall_level
 
         # Build human-readable reasons from actual matches
         reasons = []
@@ -482,6 +484,13 @@ def classify_text_detailed(text: str, source_label: str = "text") -> dict:
         low = [s for s in segments if s["level_int"] < CONFIDENTIAL_IDX]
         segments = high + low[: (100 - len(high))]
         segments.sort(key=lambda s: s["segment_id"])
+
+    # Ensure overall level is never below the highest segment level.
+    if segments:
+        max_segment_int = max(s.get("level_int", 0) for s in segments)
+        if max_segment_int > overall_level_int:
+            overall_level_int = max_segment_int
+            overall_level = INT_TO_LEVEL[overall_level_int]
 
     # ── Build overall explanation factors from all findings ─────────────────────
     factors = _build_explanation_factors_from_findings(all_findings, text)
@@ -601,8 +610,8 @@ def classify_pdf_detailed(file_bytes: bytes) -> dict:
         }
 
     pii_level_int = detect_pii_level(full_text)
-    ml_level, ml_confidence = ml_model.predict(full_text)
-    ml_level_int = LEVEL_TO_INT[ml_level]
+    ml_level, ml_confidence, version = _call_ml_service(full_text)
+    ml_level_int = LEVEL_TO_INT.get(ml_level, 1)
 
     if pii_level_int >= CONFIDENTIAL_IDX:
         overall_level_int = max(pii_level_int, ml_level_int)
@@ -612,6 +621,19 @@ def classify_pdf_detailed(file_bytes: bytes) -> dict:
         confidence = ml_confidence
 
     overall_level = INT_TO_LEVEL[overall_level_int]
+
+    # Align pages without PII to overall level to avoid contradictory UI labels.
+    for seg in all_segments:
+        if not seg.get("has_pii"):
+            seg["level"] = overall_level
+            seg["level_int"] = overall_level_int
+
+    # Ensure overall level is never below the highest page segment level.
+    if all_segments:
+        max_segment_int = max(s.get("level_int", 0) for s in all_segments)
+        if max_segment_int > overall_level_int:
+            overall_level_int = max_segment_int
+            overall_level = INT_TO_LEVEL[overall_level_int]
     all_findings = [r for seg in all_segments for r in seg["reasons"]]
     factors = _build_explanation_factors_from_findings(all_findings, full_text)
     summary = _build_summary(overall_level, confidence, factors)
@@ -621,7 +643,7 @@ def classify_pdf_detailed(file_bytes: bytes) -> dict:
         "confidence": round(confidence, 4),
         "explanation_factors": factors,
         "explanation_summary": summary,
-        "model_version": ml_model.get_model_version(),
+        "model_version": version,
         "segments": all_segments,
         "total_findings": len(all_findings),
         "extracted_text": full_text,
