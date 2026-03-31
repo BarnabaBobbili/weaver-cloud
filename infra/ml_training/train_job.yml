@@ -1,0 +1,27 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+display_name: weaver-sensitivity-training
+experiment_name: weaver-sensitivity-classifier
+description: Train the Weaver sensitivity classifier model
+
+# Use serverless compute (no need to create compute cluster)
+resources:
+  instance_type: Standard_DS3_v2
+
+code: .
+command: >-
+  python train_sensitivity.py
+  --data-path ${{inputs.training_data}}
+  --output-dir ${{outputs.model_output}}
+
+environment:
+  image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu22.04:latest
+  conda_file: conda.yml
+
+inputs:
+  training_data:
+    type: uri_file
+    path: azureml:sensitivity-dataset:1
+
+outputs:
+  model_output:
+    type: uri_folder
