@@ -4,7 +4,7 @@ import uuid
 
 from cryptography.exceptions import InvalidTag
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -91,7 +91,9 @@ async def _do_encrypt(
     iterations = policy.kdf_iterations or 600000
 
     if password:
-        wrapped_dek = crypto_service.wrap_dek_with_password(dek, password, salt, iterations, kdf_algo, key_length)
+        wrapped_dek = crypto_service.wrap_dek_with_password(
+            dek, password, salt, iterations, kdf_algo, key_length
+        )
         key_source = "password"
     else:
         wrapped_dek = crypto_service.wrap_dek_with_server_kek(dek)
@@ -115,11 +117,27 @@ async def _do_encrypt(
     integrity_hash = crypto_service.compute_hash(content_bytes, policy.hash_algo)
     dek = b"\x00" * len(dek)
 
+    # Check whether the production DB schema has blob_url column.
+    # If missing (older schema), gracefully fall back to DB-only storage.
+    blob_column_exists = False
+    try:
+        col_res = await db.execute(
+            text("""
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name='encrypted_payloads' AND column_name='blob_url'
+            LIMIT 1
+        """)
+        )
+        blob_column_exists = col_res.scalar() is not None
+    except Exception:
+        blob_column_exists = False
+
     # Hybrid storage: large payloads (>1MB) go to Blob Storage, small payloads stay in DB
     blob_url = None
     ciphertext_to_store = None
-    
-    if len(ct_with_tag) > settings.BLOB_THRESHOLD_BYTES:
+
+    if blob_column_exists and len(ct_with_tag) > settings.BLOB_THRESHOLD_BYTES:
         # Store in Azure Blob Storage
         try:
             blob_service = get_blob_service()
@@ -128,13 +146,14 @@ async def _do_encrypt(
                 container_name=settings.BLOB_CONTAINER_PAYLOADS,
                 blob_name=blob_name,
                 data=ct_with_tag,
-                overwrite=False
+                overwrite=False,
             )
             # Clear ciphertext since it's in Blob
             ciphertext_to_store = None
         except Exception as e:
             # Fall back to storing in DB if Blob upload fails
             import logging
+
             logging.warning(f"Blob upload failed, storing in DB: {e}")
             ciphertext_to_store = ct_with_tag
             blob_url = None
@@ -143,12 +162,11 @@ async def _do_encrypt(
         ciphertext_to_store = ct_with_tag
         blob_url = None
 
-    payload = EncryptedPayload(
+    payload_kwargs = dict(
         id=str(uuid.uuid4()),
         classification_id=classification_id,
         user_id=user.id,
         ciphertext=ciphertext_to_store,
-        blob_url=blob_url,
         nonce=nonce,
         salt=salt,
         wrapped_dek=wrapped_dek,
@@ -167,6 +185,12 @@ async def _do_encrypt(
         encrypted_size=len(ct_with_tag),
         encryption_time_ms=round((time.time() - t0) * 1000, 2),
     )
+
+    # Only include blob_url when actually present and schema supports it.
+    if blob_column_exists and blob_url:
+        payload_kwargs["blob_url"] = blob_url
+
+    payload = EncryptedPayload(**payload_kwargs)
     db.add(payload)
     await db.flush()
 
@@ -182,13 +206,14 @@ async def _do_encrypt(
                 "sensitivity_level": policy.sensitivity_level,
                 "encryption_algo": algo,
                 "storage_location": "blob" if blob_url else "database",
-                "payload_size": len(ct_with_tag)
-            }
+                "payload_size": len(ct_with_tag),
+            },
         )
     except Exception as e:
         import logging
+
         logging.warning(f"Failed to publish Service Bus event: {e}")
-    
+
     # Track telemetry
     try:
         telemetry = get_telemetry_service()
@@ -197,10 +222,11 @@ async def _do_encrypt(
             sensitivity_level=policy.sensitivity_level,
             payload_size_bytes=len(content_bytes),
             duration_ms=payload.encryption_time_ms,
-            success=True
+            success=True,
         )
     except Exception as e:
         import logging
+
         logging.warning(f"Failed to track telemetry: {e}")
 
     return {
@@ -239,9 +265,14 @@ async def _resolve_classification_policy(
     if not policy:
         raise HTTPException(status_code=404, detail="Policy not found")
 
-    if data.policy_override_level and data.policy_override_level != classification.predicted_level:
+    if (
+        data.policy_override_level
+        and data.policy_override_level != classification.predicted_level
+    ):
         override_policy_res = await db.execute(
-            select(CryptoPolicy).where(CryptoPolicy.sensitivity_level == data.policy_override_level)
+            select(CryptoPolicy).where(
+                CryptoPolicy.sensitivity_level == data.policy_override_level
+            )
         )
         override_policy = override_policy_res.scalar_one_or_none()
         if not override_policy:
@@ -279,7 +310,9 @@ def _enforce_mfa_challenge(policy: CryptoPolicy, current_user: User) -> None:
     )
 
 
-def _decrypt_payload_plaintext(payload: EncryptedPayload, password: str | None = None) -> str:
+def _decrypt_payload_plaintext(
+    payload: EncryptedPayload, password: str | None = None
+) -> str:
     if payload.encryption_algo == "NONE":
         import base64
 
@@ -288,8 +321,13 @@ def _decrypt_payload_plaintext(payload: EncryptedPayload, password: str | None =
     try:
         if payload.key_source == "password":
             if not password:
-                raise HTTPException(status_code=400, detail="Password required to re-encrypt this payload")
-            kdf_algo = "sha512" if payload.key_derivation == "PBKDF2-SHA512" else "sha256"
+                raise HTTPException(
+                    status_code=400,
+                    detail="Password required to re-encrypt this payload",
+                )
+            kdf_algo = (
+                "sha512" if payload.key_derivation == "PBKDF2-SHA512" else "sha256"
+            )
             key_length = 32 if "256" in payload.encryption_algo else 16
             dek = crypto_service.unwrap_dek_with_password(
                 payload.wrapped_dek,
@@ -304,12 +342,18 @@ def _decrypt_payload_plaintext(payload: EncryptedPayload, password: str | None =
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=400, detail="Failed to unwrap encryption key") from exc
+        raise HTTPException(
+            status_code=400, detail="Failed to unwrap encryption key"
+        ) from exc
 
     try:
-        plaintext_bytes = crypto_service.decrypt_aes_gcm(payload.ciphertext, dek, payload.nonce)
+        plaintext_bytes = crypto_service.decrypt_aes_gcm(
+            payload.ciphertext, dek, payload.nonce
+        )
     except InvalidTag as exc:
-        raise HTTPException(status_code=400, detail="Decryption failed: data may be tampered") from exc
+        raise HTTPException(
+            status_code=400, detail="Decryption failed: data may be tampered"
+        ) from exc
     except Exception as exc:
         raise HTTPException(status_code=400, detail="Decryption failed") from exc
     finally:
@@ -326,13 +370,19 @@ async def _encrypt_uploaded_file(
     upload: UploadFile,
     password: str | None = None,
 ) -> dict:
-    safe_filename = sanitize_filename(upload.filename or classification.file_name or "download")
+    safe_filename = sanitize_filename(
+        upload.filename or classification.file_name or "download"
+    )
     if classification.file_name and safe_filename != classification.file_name:
-        raise HTTPException(status_code=400, detail="Uploaded file does not match the classified file")
+        raise HTTPException(
+            status_code=400, detail="Uploaded file does not match the classified file"
+        )
 
     file_bytes = await upload.read(MAX_UPLOAD_MB * 1024 * 1024 + 1)
     if len(file_bytes) > MAX_UPLOAD_MB * 1024 * 1024:
-        raise HTTPException(status_code=413, detail=f"File exceeds {MAX_UPLOAD_MB} MB limit")
+        raise HTTPException(
+            status_code=413, detail=f"File exceeds {MAX_UPLOAD_MB} MB limit"
+        )
 
     result = await _do_encrypt(
         db,
@@ -356,12 +406,23 @@ async def encrypt_from_classification(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["analyst", "admin"])),
 ):
-    classification, policy = await _resolve_classification_policy(db, current_user, data, request)
+    classification, policy = await _resolve_classification_policy(
+        db, current_user, data, request
+    )
     if policy.require_mfa:
         _enforce_mfa_challenge(policy, current_user)
 
-    result = await _do_encrypt(db, current_user, policy, data.plaintext.encode(), classification.id, data.password)
-    await log_event(db, "encrypt", current_user.id, "payload", result["payload_id"], request)
+    result = await _do_encrypt(
+        db,
+        current_user,
+        policy,
+        data.plaintext.encode(),
+        classification.id,
+        data.password,
+    )
+    await log_event(
+        db, "encrypt", current_user.id, "payload", result["payload_id"], request
+    )
     return EncryptResponse(**result)
 
 
@@ -382,13 +443,17 @@ async def encrypt_file_from_classification(
         password=password,
         policy_override_level=policy_override_level,
     )
-    classification, policy = await _resolve_classification_policy(db, current_user, data, request)
+    classification, policy = await _resolve_classification_policy(
+        db, current_user, data, request
+    )
     if classification.input_type != "file":
         raise HTTPException(status_code=400, detail="Classification is not file-based")
     if policy.require_mfa:
         _enforce_mfa_challenge(policy, current_user)
 
-    result = await _encrypt_uploaded_file(db, current_user, classification, policy, file, password)
+    result = await _encrypt_uploaded_file(
+        db, current_user, classification, policy, file, password
+    )
     await log_event(
         db,
         "encrypt_file",
@@ -396,7 +461,10 @@ async def encrypt_file_from_classification(
         "payload",
         result["payload_id"],
         request,
-        details={"file_name": result.get("file_name"), "content_type": result.get("content_type")},
+        details={
+            "file_name": result.get("file_name"),
+            "content_type": result.get("content_type"),
+        },
     )
     return EncryptResponse(**result)
 
@@ -409,15 +477,33 @@ async def encrypt_verify_mfa(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["analyst", "admin"])),
 ):
-    classification, policy = await _resolve_classification_policy(db, current_user, data, request)
+    classification, policy = await _resolve_classification_policy(
+        db, current_user, data, request
+    )
     if policy.require_mfa:
         if not current_user.mfa_enabled or not current_user.mfa_secret:
-            raise HTTPException(status_code=403, detail="MFA is not enabled for this account")
+            raise HTTPException(
+                status_code=403, detail="MFA is not enabled for this account"
+            )
         if not verify_totp(current_user.mfa_secret, data.totp_code):
             raise HTTPException(status_code=401, detail="Invalid MFA code")
 
-    result = await _do_encrypt(db, current_user, policy, data.plaintext.encode(), classification.id, data.password)
-    await log_event(db, "encrypt_verify_mfa", current_user.id, "payload", result["payload_id"], request)
+    result = await _do_encrypt(
+        db,
+        current_user,
+        policy,
+        data.plaintext.encode(),
+        classification.id,
+        data.password,
+    )
+    await log_event(
+        db,
+        "encrypt_verify_mfa",
+        current_user.id,
+        "payload",
+        result["payload_id"],
+        request,
+    )
     return EncryptResponse(**result)
 
 
@@ -440,17 +526,30 @@ async def encrypt_file_verify_mfa(
         policy_override_level=policy_override_level,
         totp_code=totp_code,
     )
-    classification, policy = await _resolve_classification_policy(db, current_user, data, request)
+    classification, policy = await _resolve_classification_policy(
+        db, current_user, data, request
+    )
     if classification.input_type != "file":
         raise HTTPException(status_code=400, detail="Classification is not file-based")
     if policy.require_mfa:
         if not current_user.mfa_enabled or not current_user.mfa_secret:
-            raise HTTPException(status_code=403, detail="MFA is not enabled for this account")
+            raise HTTPException(
+                status_code=403, detail="MFA is not enabled for this account"
+            )
         if not verify_totp(current_user.mfa_secret, totp_code):
             raise HTTPException(status_code=401, detail="Invalid MFA code")
 
-    result = await _encrypt_uploaded_file(db, current_user, classification, policy, file, password)
-    await log_event(db, "encrypt_file_verify_mfa", current_user.id, "payload", result["payload_id"], request)
+    result = await _encrypt_uploaded_file(
+        db, current_user, classification, policy, file, password
+    )
+    await log_event(
+        db,
+        "encrypt_file_verify_mfa",
+        current_user.id,
+        "payload",
+        result["payload_id"],
+        request,
+    )
     return EncryptResponse(**result)
 
 
@@ -467,12 +566,18 @@ async def encrypt_direct(
     )
     policy = policy_res.scalar_one_or_none()
     if not policy:
-        raise HTTPException(status_code=404, detail=f"No policy for level: {data.policy_level}")
+        raise HTTPException(
+            status_code=404, detail=f"No policy for level: {data.policy_level}"
+        )
     if policy.require_mfa:
         _enforce_mfa_challenge(policy, current_user)
 
-    result = await _do_encrypt(db, current_user, policy, data.plaintext.encode(), None, data.password)
-    await log_event(db, "encrypt_direct", current_user.id, "payload", result["payload_id"], request)
+    result = await _do_encrypt(
+        db, current_user, policy, data.plaintext.encode(), None, data.password
+    )
+    await log_event(
+        db, "encrypt_direct", current_user.id, "payload", result["payload_id"], request
+    )
     return EncryptResponse(**result)
 
 

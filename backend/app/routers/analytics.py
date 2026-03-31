@@ -344,6 +344,11 @@ async def dashboard(
         ml_endpoint_url = os.environ.get("AZURE_ML_ENDPOINT_URL")
 
         if ml_endpoint_url:
+            # Endpoint is configured, so treat ML service as primary source.
+            # Health probe is best-effort for version/status only.
+            ml_model_source = "ml_service"
+            ml_model_version = "distilbert-mnli-v1.0"
+
             # Try to verify ML service is healthy
             try:
                 import httpx
@@ -351,18 +356,17 @@ async def dashboard(
                 # Extract base URL from classify endpoint
                 base_url = ml_endpoint_url.replace("/classify", "")
 
-                async with httpx.AsyncClient(timeout=5.0) as client:
+                async with httpx.AsyncClient(timeout=2.5) as client:
                     health_response = await client.get(f"{base_url}/health")
 
                     if health_response.status_code == 200:
                         health_data = health_response.json()
-                        ml_model_source = "ml_service"
                         ml_model_version = health_data.get(
                             "model_version", "distilbert-mnli-v1.0"
                         )
             except Exception as e:
                 logger.warning(f"ML service health check failed: {e}")
-                # Fall through to check other sources
+                # Keep ml_model_source as 'ml_service' when endpoint is configured.
 
         # Check for cloud-trained model (second priority)
         if ml_model_source == "local":
