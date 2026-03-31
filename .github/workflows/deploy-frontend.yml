@@ -82,7 +82,7 @@ jobs:
           az containerapp registry set \
             --name weaver-backend \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --server weaveracr.azurecr.io \
+            --server weaveracr2q1qus.azurecr.io \
             --username ${{ secrets.ACR_USERNAME }} \
             --password ${{ secrets.ACR_PASSWORD }}
 

@@ -14,10 +14,11 @@ permissions:
   contents: read
 
 env:
-  REGISTRY: weaveracr.azurecr.io
+  REGISTRY: weaveracr2q1qus.azurecr.io
   IMAGE_NAME: weaver-ml
   RESOURCE_GROUP: weaver-rg
   CONTAINER_APP: weaver-ml
+  CONTAINER_ENV: weaver-env
 
 jobs:
   build-and-deploy:
@@ -97,7 +98,7 @@ jobs:
           az containerapp registry set \
             --name weaver-backend \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --server ${{ env.REGISTRY }} \
+            --server weaveracr2q1qus.azurecr.io \
             --username ${{ secrets.ACR_USERNAME }} \
             --password ${{ secrets.ACR_PASSWORD }}
           

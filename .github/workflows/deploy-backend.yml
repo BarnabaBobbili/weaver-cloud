@@ -14,10 +14,13 @@ permissions:
   contents: read
 
 env:
-  REGISTRY: weaveracr.azurecr.io
+  REGISTRY: weaveracr2q1qus.azurecr.io
   IMAGE_NAME: weaver-backend
   RESOURCE_GROUP: weaver-rg
   CONTAINER_APP: weaver-backend
+  CONTAINER_ENV: weaver-env
+  KEY_VAULT_NAME: weaver-kv-2q1qus
+  MANAGED_IDENTITY_CLIENT_ID: 486767f8-8826-487e-9cb8-5bc6fdc60944
 
 jobs:
   build-and-deploy:
