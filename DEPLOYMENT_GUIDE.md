@@ -81,7 +81,8 @@ psql "postgresql://<azure-user>:<azure-pass>@weaver-db-prod.postgres.database.az
 
 ## Operational Notes
 
-- Keep `CORS_ORIGINS` aligned with frontend hostname.
+- Keep `CORS_ORIGINS` aligned with the primary frontend hostname.
+- Keep `CORS_ORIGIN_REGEX` enabled for Azure Static Web Apps preview hostnames.
 - Run seed scripts only in controlled environments.
 - Use Azure Key Vault for secret rotation and runtime retrieval.
 - For Power BI through Synapse serverless, use server:

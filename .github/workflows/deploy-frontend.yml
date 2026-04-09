@@ -89,7 +89,9 @@ jobs:
           az containerapp update \
             --name weaver-backend \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --set-env-vars "CORS_ORIGINS=${{ steps.frontend.outputs.frontend_url }}"
+            --set-env-vars \
+              "CORS_ORIGINS=${{ steps.frontend.outputs.frontend_url }}" \
+              'CORS_ORIGIN_REGEX=^https://[a-z0-9-]+(\.[a-z0-9-]+)?\.azurestaticapps\.net$'
       
       - name: Notification
         if: success()

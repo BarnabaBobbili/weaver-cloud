@@ -35,6 +35,7 @@ class Settings:
     - KEY_VAULT_URL: Azure Key Vault URL
     - AZURE_CLIENT_ID: Managed Identity client ID
     - CORS_ORIGINS: Allowed CORS origins
+    - CORS_ORIGIN_REGEX: Optional regex for allowed CORS origins
     
     All secrets from Key Vault (secret names use hyphens):
     - DATABASE-URL: PostgreSQL connection string
@@ -55,6 +56,10 @@ class Settings:
         self.APP_NAME: str = "Weaver"
         self.APP_VERSION: str = "1.0.0"
         self.CORS_ORIGINS: str = os.environ.get("CORS_ORIGINS", "http://localhost:5173")
+        self.CORS_ORIGIN_REGEX: str = os.environ.get(
+            "CORS_ORIGIN_REGEX",
+            r"^https://[a-z0-9-]+(\.[a-z0-9-]+)?\.azurestaticapps\.net$",
+        )
         self.DEBUG: bool = os.environ.get("DEBUG", "false").lower() == "true"
         self.COOKIE_SECURE: bool = os.environ.get("COOKIE_SECURE", "true").lower() == "true"
         
@@ -161,7 +166,12 @@ class Settings:
     
     @property
     def cors_origins_list(self) -> list[str]:
-        return [o.strip() for o in self.CORS_ORIGINS.split(",")]
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def cors_origin_regex(self) -> Optional[str]:
+        regex = self.CORS_ORIGIN_REGEX.strip()
+        return regex or None
     
     # Legacy compatibility - MODEL_PATH no longer used (models come from Azure ML)
     @property
