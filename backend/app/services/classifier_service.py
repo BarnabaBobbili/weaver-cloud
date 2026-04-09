@@ -223,6 +223,25 @@ _SENSITIVE_KW_META = [
     ("internal", "internal", 0.08, "Internal Document Marker"),
 ]
 
+_PUBLIC_HINTS = (
+    "public",
+    "press release",
+    "blog post",
+    "marketing copy",
+    "documentation",
+    "open source",
+    "announcement",
+)
+_INTERNAL_HINTS = (
+    "internal",
+    "team",
+    "sprint",
+    "meeting",
+    "roadmap",
+    "design doc",
+    "project plan",
+)
+
 
 def _scan_line_for_pii(line: str, line_num: int) -> list[dict]:
     """
@@ -270,6 +289,48 @@ def _level_display(level: str) -> str:
     return level.replace("_", " ").title()
 
 
+def _heuristic_level_without_ml(text: str, pii_level_int: int | None = None) -> tuple[str, float]:
+    """
+    Rule-based fallback when ML inference is unavailable.
+    Avoids forcing all unknown content into "confidential".
+    """
+    if pii_level_int is None:
+        pii_level_int = detect_pii_level(text)
+    if pii_level_int >= CONFIDENTIAL_IDX:
+        return INT_TO_LEVEL[pii_level_int], 0.92
+
+    text_lower = text.lower()
+    if any(hint in text_lower for hint in _PUBLIC_HINTS):
+        return "public", 0.62
+    if any(hint in text_lower for hint in _INTERNAL_HINTS):
+        return "internal", 0.62
+    return "internal", 0.55
+
+
+def _calibrate_ml_prediction(
+    text: str, pii_level_int: int, ml_level: str, ml_confidence: float
+) -> tuple[str, float]:
+    """
+    Calibrate over-conservative ML outputs when confidence is weak and PII is absent.
+    """
+    if pii_level_int >= CONFIDENTIAL_IDX:
+        return ml_level, ml_confidence
+
+    text_lower = text.lower()
+    has_public_hint = any(hint in text_lower for hint in _PUBLIC_HINTS)
+    has_internal_hint = any(hint in text_lower for hint in _INTERNAL_HINTS)
+
+    if ml_level == "confidential" and ml_confidence < 0.60:
+        if has_public_hint and not has_internal_hint:
+            return "public", max(ml_confidence, 0.56)
+        return "internal", max(ml_confidence, 0.56)
+
+    if ml_level == "highly_sensitive" and ml_confidence < 0.75:
+        return "confidential", max(ml_confidence, 0.75)
+
+    return ml_level, ml_confidence
+
+
 def _call_ml_service(text: str) -> tuple[str, float, str]:
     """
     Call the ML service endpoint for classification.
@@ -286,7 +347,8 @@ def _call_ml_service(text: str) -> tuple[str, float, str]:
             logger.error(
                 f"Local model prediction failed (no ML endpoint configured): {e}"
             )
-            return "confidential", 0.5, "fallback:safe-default"
+            fallback_level, fallback_conf = _heuristic_level_without_ml(text)
+            return fallback_level, fallback_conf, "fallback:rule-based"
 
     try:
         # Call ML service endpoint
@@ -317,7 +379,8 @@ def _call_ml_service(text: str) -> tuple[str, float, str]:
     except Exception as e:
         # Never crash request path because model deserialization failed.
         logger.error(f"Local model fallback failed, using safe default: {e}")
-        return "confidential", 0.5, "fallback:safe-default"
+        fallback_level, fallback_conf = _heuristic_level_without_ml(text)
+        return fallback_level, fallback_conf, "fallback:rule-based"
 
 
 def classify_text(text: str) -> dict:
@@ -332,6 +395,9 @@ def classify_text(text: str) -> dict:
 
     # Layer 2: ML classifier (uses ML service if available, else local model)
     ml_level, ml_confidence, version = _call_ml_service(text)
+    ml_level, ml_confidence = _calibrate_ml_prediction(
+        text, pii_level_int, ml_level, ml_confidence
+    )
     ml_level_int = LEVEL_TO_INT.get(ml_level, 1)  # default to internal if unknown
 
     # Layer 3: Decision
@@ -375,6 +441,9 @@ def classify_text_detailed(text: str, source_label: str = "text") -> dict:
     # ── ML runs once on full text (uses ML service if available) ─────────────────
     pii_level_int = detect_pii_level(text)
     ml_level, ml_confidence, version = _call_ml_service(text)
+    ml_level, ml_confidence = _calibrate_ml_prediction(
+        text, pii_level_int, ml_level, ml_confidence
+    )
     ml_level_int = LEVEL_TO_INT.get(ml_level, 1)
 
     if pii_level_int >= CONFIDENTIAL_IDX:
@@ -611,6 +680,9 @@ def classify_pdf_detailed(file_bytes: bytes) -> dict:
 
     pii_level_int = detect_pii_level(full_text)
     ml_level, ml_confidence, version = _call_ml_service(full_text)
+    ml_level, ml_confidence = _calibrate_ml_prediction(
+        full_text, pii_level_int, ml_level, ml_confidence
+    )
     ml_level_int = LEVEL_TO_INT.get(ml_level, 1)
 
     if pii_level_int >= CONFIDENTIAL_IDX:
