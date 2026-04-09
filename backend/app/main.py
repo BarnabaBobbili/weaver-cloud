@@ -229,5 +229,26 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.exception(f"Unhandled exception on {request.method} {request.url.path}")
     
     if settings.DEBUG:
-        return JSONResponse({"detail": str(exc)}, status_code=500)
-    return JSONResponse({"detail": "Internal server error"}, status_code=500)
+        response = JSONResponse({"detail": str(exc)}, status_code=500)
+    else:
+        response = JSONResponse({"detail": "Internal server error"}, status_code=500)
+    _apply_error_cors_headers(request, response)
+    return response
+
+
+def _apply_error_cors_headers(request: Request, response: JSONResponse) -> None:
+    """
+    Ensure error responses still carry CORS headers for allowed origins.
+    This covers errors produced before CORSMiddleware can attach headers.
+    """
+    origin = request.headers.get("origin")
+    if not settings.is_cors_origin_allowed(origin):
+        return
+    response.headers["Access-Control-Allow-Origin"] = origin
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    vary = response.headers.get("Vary")
+    if vary:
+        if "Origin" not in vary:
+            response.headers["Vary"] = f"{vary}, Origin"
+    else:
+        response.headers["Vary"] = "Origin"

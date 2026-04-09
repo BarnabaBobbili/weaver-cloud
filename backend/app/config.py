@@ -7,6 +7,7 @@ Bootstrap config (KEY_VAULT_URL, AZURE_CLIENT_ID) comes from Container Apps env 
 from __future__ import annotations
 
 import os
+import re
 import logging
 from functools import lru_cache
 from typing import Optional
@@ -172,6 +173,14 @@ class Settings:
     def cors_origin_regex(self) -> Optional[str]:
         regex = self.CORS_ORIGIN_REGEX.strip()
         return regex or None
+
+    def is_cors_origin_allowed(self, origin: Optional[str]) -> bool:
+        if not origin:
+            return False
+        if origin in self.cors_origins_list:
+            return True
+        regex = self.cors_origin_regex
+        return bool(regex and re.fullmatch(regex, origin))
     
     # Legacy compatibility - MODEL_PATH no longer used (models come from Azure ML)
     @property

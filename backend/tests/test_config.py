@@ -45,3 +45,21 @@ def test_cors_origin_regex_can_be_disabled(monkeypatch: pytest.MonkeyPatch):
     settings = Settings()
 
     assert settings.cors_origin_regex is None
+
+
+def test_is_cors_origin_allowed_for_exact_origin(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("CORS_ORIGINS", "https://app.example.com")
+    monkeypatch.setenv("CORS_ORIGIN_REGEX", "")
+    settings = Settings()
+
+    assert settings.is_cors_origin_allowed("https://app.example.com")
+    assert not settings.is_cors_origin_allowed("https://other.example.com")
+
+
+def test_is_cors_origin_allowed_for_regex_origin(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("CORS_ORIGINS", "http://localhost:5173")
+    monkeypatch.setenv("CORS_ORIGIN_REGEX", r"^https://[a-z0-9-]+(\.[a-z0-9-]+)?\.azurestaticapps\.net$")
+    settings = Settings()
+
+    assert settings.is_cors_origin_allowed("https://black-bay-0d15f0a00.7.azurestaticapps.net")
+    assert not settings.is_cors_origin_allowed("https://example.com")
